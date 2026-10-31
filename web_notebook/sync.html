@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style id="sp-dark-scrollbars">
+  html.nightMode { color-scheme: dark; }
+  html:has(body.nightMode) { color-scheme: dark; }
+</style>
+<meta charset="UTF-8">
+<title>Changes</title>
+<style>
+  :root {
+    --bg: #ffffff; --header-bg: #f2f2f2; --text: #37352f; --text-gray: #787774; --hover-bg: #efefef;
+    --border: rgba(0,0,0,0.1); --input-bg: #f7f7f5; --card-bg: #f7f7f5; --accent: var(--synapse-primary, #0071D3);
+    --danger: #e03e3e; --warn: #b7791f; --ok: #2f855a;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  body.nightMode {
+    --bg: #2c2c2c; --header-bg: #252525; --text: #ffffff; --text-gray: #b0b0b0; --hover-bg: #414141;
+    --border: rgba(255,255,255,0.12); --input-bg: #414141; --card-bg: #252525; --accent: var(--synapse-primary, #4a9eff);
+    --danger: #e05a5a; --warn: #e0a84a; --ok: #5fc08a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
+  #app { overflow-y: auto; padding: 18px 20px 40px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  h2 { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-gray); margin: 24px 0 8px; }
+  .sub { color: var(--text-gray); font-size: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 11.5px; color: var(--text-gray); background: var(--card-bg); }
+  .chip.dirty { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+  .chip.ok { color: var(--ok); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { font: inherit; font-weight: 600; font-size: 12px; min-height: 32px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--hover-bg); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { opacity: .88; background: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  #message { margin-top: 12px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); font-size: 12px; display: none; }
+  #message.show { display: block; }
+  #message.error { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); color: var(--danger); }
+  #message.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); color: var(--warn); }
+  #message.ok { border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); color: var(--ok); }
+  .card { border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); padding: 4px 14px; }
+  .group-title { font-size: 11.5px; font-weight: 650; margin: 10px 0 4px; }
+  .group-title .count { color: var(--text-gray); font-weight: 500; }
+  ul.items { list-style: none; margin-bottom: 8px; }
+  ul.items li { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+  ul.items li:first-child { border-top: none; }
+  .badge { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 5px; padding: 0 5px; color: #fff; }
+  .badge.A { background: var(--ok); } .badge.M { background: var(--accent); } .badge.D { background: var(--danger); }
+  .empty { padding: 14px 0; color: var(--text-gray); text-align: center; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--text-gray); font-size: 12px; padding: 4px 0; }
+  .file { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--text-gray); }
+  .field { margin: 12px 0; }
+  .field > label.title { display: block; font-weight: 650; font-size: 12px; margin-bottom: 4px; }
+  .row { display: flex; gap: 8px; }
+  input[type=text], select { width: 100%; font: inherit; font-size: 12.5px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+  input[type=text]:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 0; }
+  .check { display: flex; align-items: flex-start; gap: 9px; padding: 6px 0; cursor: pointer; }
+  .check input { margin-top: 3px; accent-color: var(--accent); }
+  .check .t { font-weight: 600; font-size: 12.5px; }
+  .check .h { color: var(--text-gray); font-size: 11.5px; }
+  .hint { color: var(--text-gray); font-size: 11.5px; margin-top: 4px; }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--card-bg); border: 1px dashed var(--border); color: var(--text-gray); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="wrap">
+  <h1 data-i18n="sync_title">Changes</h1>
+  <div class="sub" data-i18n="sync_subtitle">Keep your notes and tasks the same on all your computers.</div>
+  <div class="chips" id="chips"></div>
+  <div class="actions">
+    <button class="primary" id="btn-sync" data-i18n="sync_now">Sync now</button>
+    <button id="btn-pull" data-i18n="sync_pull">Pull</button>
+    <button id="btn-push" data-i18n="sync_push">Commit &amp; push</button>
+  </div>
+  <div id="message" role="status"></div>
+
+  <h2 data-i18n="sync_pending">Not yet synced</h2>
+  <div class="card" id="pending"></div>
+  <details id="files-wrap"><summary data-i18n="sync_files">Files in the sync folder</summary><div class="card" id="files"></div></details>
+
+  <h2 data-i18n="sync_setup">Setup</h2>
+  <div class="card" style="padding:6px 16px 14px">
+    <div class="field">
+      <label class="title" for="folder" data-i18n="sync_folder">Sync folder</label>
+      <div class="row"><input type="text" id="folder" autocomplete="off" data-i18n-placeholder="sync_folder_ph" placeholder="A folder in Dropbox, or a Git repository"><button id="btn-choose" data-i18n="sync_choose">Choose…</button></div>
+      <div class="hint" data-i18n="sync_folder_hint">Your database stays on this computer. Only one small file per page and task goes into this folder.</div>
+    </div>
+    <label class="check"><input type="checkbox" id="use-git"><span><span class="t" data-i18n="sync_use_git">Use Git</span><br><span class="h" data-i18n="sync_use_git_hint">Turn this off if Dropbox or another tool carries the folder.</span></span></label>
+    <div class="field" id="clone-field">
+      <label class="title" for="repo-url" data-i18n="sync_repo">Repository address</label>
+      <div class="row"><input type="text" id="repo-url" autocomplete="off" placeholder="git@github.com:you/synapse-notes.git"><button id="btn-clone" data-i18n="sync_clone">Download repository</button></div>
+      <div class="hint" data-i18n="sync_repo_hint">Only needed on a new computer: downloads your existing repository into an empty sync folder.</div>
+    </div>
+    <label class="check"><input type="checkbox" id="auto-pull"><span><span class="t" data-i18n="sync_auto_pull">Pull when Anki starts</span></span></label>
+    <label class="check"><input type="checkbox" id="auto-push"><span><span class="t" data-i18n="sync_auto_push">Push when Anki closes</span><br><span class="h" data-i18n="sync_auto_push_hint">Without internet, closing can take a few seconds longer.</span></span></label>
+    <div class="field">
+      <label class="title" data-i18n="sync_what">What to sync</label>
+      <label class="check"><input type="checkbox" id="cat-notebook"><span class="t" data-i18n="sync_cat_notebook">Notebook</span></label>
+      <label class="check"><input type="checkbox" id="cat-todos"><span class="t" data-i18n="sync_cat_todos">To-do list</span></label>
+      <div class="hint" data-i18n="sync_what_hint">PDFs, progress and settings are not synced yet. API keys are never synced.</div>
+    </div>
+    <div class="field">
+      <label class="title" for="first" data-i18n="sync_first">First sync on a new computer</label>
+      <select id="first">
+        <option value="merge" data-i18n="sync_first_merge">Keep both versions</option>
+        <option value="local" data-i18n="sync_first_local">Prefer this computer</option>
+        <option value="remote" data-i18n="sync_first_remote">Prefer the sync folder</option>
+      </select>
+      <div class="hint" data-i18n="sync_first_hint">Only applies to pages that exist on both sides and differ. “Keep both” never loses anything.</div>
+    </div>
+    <div class="actions"><button class="primary" id="btn-save" data-i18n="sync_save">Save settings</button></div>
+  </div>
+  <div class="note" data-i18n="sync_privacy">Use a private repository. Your notes, including pictures, are uploaded to it. Git needs an SSH key or a saved login, because this tab cannot ask for a password.</div>
+</div></div>
+<script>
+'use strict';
+if (document.documentElement.classList.contains('nightMode') || document.body.classList.contains('nightMode')) {
+  document.body.classList.add('nightMode');
+}
+const T = (key, fallback) => (window.__SYNAPSE_I18N__ && window.__SYNAPSE_I18N__[key]) || fallback;
+const $ = id => document.getElementById(id);
+const send = (action, data) => {
+  const payload = data === undefined ? '' : ':' + JSON.stringify(data);
+  if (typeof pycmd === 'function') pycmd('notion_mini:sync:' + action + payload);
+};
+let S = null, busyLocal = false, formDirty = false;
+
+(function applyI18n() {
+  const t = window.__SYNAPSE_I18N__;
+  if (!t) return;
+  document.title = t.sync_title || document.title;
+  document.querySelectorAll('[data-i18n]').forEach(el => { if (t[el.dataset.i18n] !== undefined) el.textContent = t[el.dataset.i18n]; });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { if (t[el.dataset.i18nPlaceholder] !== undefined) el.placeholder = t[el.dataset.i18nPlaceholder]; });
+})();
+
+function ago(seconds) {
+  if (!seconds) return T('sync_never', 'Never synced');
+  const d = new Date(seconds * 1000);
+  return T('sync_last', 'Last sync: {time}').replace('{time}', d.toLocaleString());
+}
+function chip(text, cls) {
+  const el = document.createElement('span');
+  el.className = 'chip' + (cls ? ' ' + cls : '');
+  if (cls) { const dot = document.createElement('span'); dot.className = 'dot'; el.appendChild(dot); }
+  el.appendChild(document.createTextNode(text));
+  return el;
+}
+function fmt(template, values) { return Object.keys(values).reduce((s, k) => s.replace('{' + k + '}', values[k]), template); }
+
+const ERRORS = {
+  offline: ['warn', 'sync_err_offline', 'No connection. Your changes are saved in the sync folder and will be pushed next time.'],
+  auth: ['error', 'sync_err_auth', 'Git could not sign in. Set up an SSH key or a saved login for this repository.'],
+  rejected: ['warn', 'sync_err_rejected', 'The remote has newer changes. Pull first, then push again.'],
+  timeout: ['warn', 'sync_err_timeout', 'Git took too long to answer.'],
+  missing: ['warn', 'sync_err_missing', 'The sync folder is not a Git repository. Your data was still exported to the folder.'],
+  not_configured: ['error', 'sync_err_not_configured', 'Choose a sync folder first.'],
+  busy: ['warn', 'sync_err_busy', 'A sync is already running.'],
+  flush: ['error', 'sync_err_flush', 'Your open page could not be saved, so nothing was synced.'],
+  save: ['error', 'sync_err_save', 'The merged data could not be stored. Your notes are unchanged.'],
+};
+function showMessage(text, cls) {
+  const el = $('message');
+  el.textContent = text;
+  el.className = text ? 'show ' + (cls || '') : '';
+}
+function describeResult(r) {
+  if (!r) return;
+  if (r.error) {
+    const known = ERRORS[r.error[0]];
+    const text = known ? T(known[1], known[2]) : String(r.error[1] || '');
+    showMessage(text, known ? known[0] : 'error');
+    return;
+  }
+  const parts = [];
+  if (r.kind === 'push') parts.push(T('sync_done_push', 'Pushed.'));
+  else if (r.kind === 'pull') parts.push(T('sync_done_pull', 'Pulled and merged.'));
+  else parts.push(T('sync_done', 'Synced.'));
+  if (r.changed && (r.changed.notebook || r.changed.todos)) parts.push(T('sync_updated', 'New data from the other computer was added.'));
+  if (r.conflicts && r.conflicts.length) parts.push(fmt(T('sync_conflicts', '{count} pages were changed on both computers. Both versions were kept; the other one is marked “(conflict)”.'), { count: r.conflicts.length }));
+  if (r.skipped && r.skipped.length) parts.push(fmt(T('sync_skipped', '{count} damaged files were skipped.'), { count: r.skipped.length }));
+  showMessage(parts.join(' '), r.conflicts && r.conflicts.length ? 'warn' : 'ok');
+}
+
+function renderGroup(container, title, items, code) {
+  if (!items || !items.length) return;
+  const head = document.createElement('div');
+  head.className = 'group-title';
+  head.textContent = title + ' ';
+  const count = document.createElement('span'); count.className = 'count'; count.textContent = '(' + items.length + ')';
+  head.appendChild(count);
+  const list = document.createElement('ul'); list.className = 'items';
+  items.slice(0, 200).forEach(item => {
+    const li = document.createElement('li');
+    const b = document.createElement('span'); b.className = 'badge ' + code; b.textContent = code;
+    const label = document.createElement('span'); label.textContent = item.title || T('sync_untitled', 'Untitled');
+    li.append(b, label);
+    list.appendChild(li);
+  });
+  container.append(head, list);
+}
+
+function render(status) {
+  S = status;
+  const cfg = status.config || {};
+  const git = status.git || {};
+  const chips = $('chips');
+  chips.replaceChildren();
+  chips.appendChild(status.dirty ? chip(T('sync_chip_dirty', 'Changes not pushed'), 'dirty') : chip(status.configured ? T('sync_chip_clean', 'Everything is synced') : T('sync_chip_unset', 'Not set up'), status.configured ? 'ok' : ''));
+  chips.appendChild(chip(ago(status.last_sync)));
+  if (git.repo) {
+    if (git.branch) chips.appendChild(chip(fmt(T('sync_chip_branch', 'Branch {name}'), { name: git.branch })));
+    if (git.ahead) chips.appendChild(chip(fmt(T('sync_chip_ahead', '{count} to push'), { count: git.ahead }), 'dirty'));
+    if (git.behind) chips.appendChild(chip(fmt(T('sync_chip_behind', '{count} to pull'), { count: git.behind })));
+    if (!git.remote) chips.appendChild(chip(T('sync_chip_noremote', 'No remote set'), 'dirty'));
+  } else if (cfg.sync_git && status.configured) {
+    chips.appendChild(chip(status.git_available ? T('sync_chip_norepo', 'Not a Git repository') : T('sync_chip_nogit', 'Git is not installed'), 'dirty'));
+  }
+  const busy = status.busy || busyLocal;
+  ['btn-sync', 'btn-pull', 'btn-push', 'btn-clone', 'btn-choose', 'btn-save'].forEach(id => { $(id).disabled = busy; });
+  $('btn-pull').disabled = busy || !cfg.sync_git;
+  $('btn-sync').textContent = busy ? T('sync_running', 'Syncing…') : T('sync_now', 'Sync now');
+
+  const pending = $('pending');
+  pending.replaceChildren();
+  let any = false;
+  [['notebook', T('sync_cat_notebook', 'Notebook')], ['todos', T('sync_cat_todos', 'To-do list')]].forEach(([key, label]) => {
+    const part = status.local && status.local[key];
+    if (!part) return;
+    const before = pending.childNodes.length;
+    const box = document.createElement('div');
+    renderGroup(box, label + ' · ' + T('sync_new', 'New'), part.added, 'A');
+    renderGroup(box, label + ' · ' + T('sync_changed', 'Changed'), part.modified, 'M');
+    renderGroup(box, label + ' · ' + T('sync_deleted', 'Deleted'), part.deleted, 'D');
+    if (box.childNodes.length) { pending.appendChild(box); any = true; }
+  });
+  if (git.ahead) {
+    const note = document.createElement('div');
+    note.className = 'group-title';
+    note.textContent = fmt(T('sync_unpushed', '{count} saved changes are waiting to be pushed.'), { count: git.ahead });
+    pending.appendChild(note); any = true;
+  }
+  if (!any) { const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = status.configured ? T('sync_nothing', 'Everything is synced.') : T('sync_set_up_first', 'Set up a sync folder below to get started.'); pending.appendChild(empty); }
+
+  const files = $('files');
+  files.replaceChildren();
+  const changed = git.changed || [];
+  $('files-wrap').style.display = changed.length ? '' : 'none';
+  const list = document.createElement('ul'); list.className = 'items';
+  changed.slice(0, 300).forEach(([code, path]) => {
+    const li = document.createElement('li');
+    const b = document.createElement('span'); b.className = 'badge ' + (['A', 'M', 'D'].includes(code) ? code : 'M'); b.textContent = code;
+    const f = document.createElement('span'); f.className = 'file'; f.textContent = path;
+    li.append(b, f); list.appendChild(li);
+  });
+  files.appendChild(list);
+
+  if (!formDirty) {
+    $('folder').value = cfg.sync_folder || '';
+    $('use-git').checked = !!cfg.sync_git;
+    $('auto-pull').checked = !!cfg.sync_auto_pull;
+    $('auto-push').checked = !!cfg.sync_auto_push;
+    $('cat-notebook').checked = !!cfg.sync_notebook;
+    $('cat-todos').checked = !!cfg.sync_todos;
+    $('first').value = cfg.sync_first || 'merge';
+  }
+  $('clone-field').style.display = $('use-git').checked ? '' : 'none';
+  if (status.error && !$('message').classList.contains('show')) describeResult({ error: status.error });
+}
+
+function collect() {
+  return {
+    sync_folder: $('folder').value, sync_git: $('use-git').checked, sync_auto_pull: $('auto-pull').checked,
+    sync_auto_push: $('auto-push').checked, sync_notebook: $('cat-notebook').checked, sync_todos: $('cat-todos').checked,
+    sync_first: $('first').value
+  };
+}
+function run(kind) {
+  if (formDirty) { send('save', collect()); formDirty = false; }
+  busyLocal = true; showMessage('', '');
+  if (S) render(S);
+  send('run', { kind });
+}
+$('btn-sync').onclick = () => run('sync');
+$('btn-pull').onclick = () => run('pull');
+$('btn-push').onclick = () => run('push');
+$('btn-choose').onclick = () => { send('choose-folder'); };
+$('btn-save').onclick = () => { formDirty = false; send('save', collect()); showMessage(T('sync_saved', 'Settings saved.'), 'ok'); };
+$('btn-clone').onclick = () => {
+  const url = $('repo-url').value.trim();
+  if (!url) { showMessage(T('sync_enter_url', 'Enter the repository address first.'), 'error'); return; }
+  formDirty = false; send('save', collect()); busyLocal = true; if (S) render(S);
+  send('clone', { url });
+};
+document.querySelectorAll('#folder,#use-git,#auto-pull,#auto-push,#cat-notebook,#cat-todos,#first').forEach(el => {
+  el.addEventListener('input', () => { formDirty = true; $('clone-field').style.display = $('use-git').checked ? '' : 'none'; });
+  el.addEventListener('change', () => { formDirty = true; $('clone-field').style.display = $('use-git').checked ? '' : 'none'; });
+});
+
+// Called by Python.
+window.syncRender = status => { if (!status || typeof status !== 'object') return; busyLocal = false; render(status); };
+window.syncResult = result => { busyLocal = false; describeResult(result); if (S) render(S); };
+window.syncFolderChosen = folder => { $('folder').value = String(folder || ''); formDirty = true; };
+if (window.__SYNAPSE_SYNC__) render(window.__SYNAPSE_SYNC__);
+send('refresh');
+</script>
+</body>
+</html>

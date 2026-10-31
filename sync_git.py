@@ -122,6 +122,10 @@ def status(folder: str) -> dict:
         counts = run(["rev-list", "--left-right", "--count", f"HEAD...{upstream}"], folder, 10, check=False).split()
         if len(counts) == 2 and all(c.isdigit() for c in counts):
             info["ahead"], info["behind"] = int(counts[0]), int(counts[1])
+    elif info["remote"]:
+        # Never pushed: every commit is still unpublished.
+        total = run(["rev-list", "--count", "HEAD"], folder, 10, check=False).strip()
+        info["ahead"] = int(total) if total.isdigit() else 0
     return info
 
 

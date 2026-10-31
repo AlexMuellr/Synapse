@@ -320,6 +320,75 @@ def _build_i18n_script(tool_name: str) -> str:
             "cover_title": _("Cover for learning"),
             "recover_covers_title": _("Cover all revealed terms again"),
         },
+        "sync": {
+            "sync_title": _("Changes"),
+            "sync_subtitle": _("Keep your notes and tasks the same on all your computers."),
+            "sync_now": _("Sync now"),
+            "sync_pull": _("Pull"),
+            "sync_push": _("Commit & push"),
+            "sync_pending": _("Not yet synced"),
+            "sync_files": _("Files in the sync folder"),
+            "sync_setup": _("Setup"),
+            "sync_folder": _("Sync folder"),
+            "sync_choose": _("Choose…"),
+            "sync_folder_ph": _("A folder in Dropbox, or a Git repository"),
+            "sync_folder_hint": _("Your database stays on this computer. Only one small file per page and task goes into this folder."),
+            "sync_use_git": _("Use Git"),
+            "sync_use_git_hint": _("Turn this off if Dropbox or another tool carries the folder."),
+            "sync_repo": _("Repository address"),
+            "sync_clone": _("Download repository"),
+            "sync_repo_hint": _("Only needed on a new computer: downloads your existing repository into an empty sync folder."),
+            "sync_auto_pull": _("Pull when Anki starts"),
+            "sync_auto_push": _("Push when Anki closes"),
+            "sync_auto_push_hint": _("Without internet, closing can take a few seconds longer."),
+            "sync_what": _("What to sync"),
+            "sync_cat_notebook": _("Notebook"),
+            "sync_cat_todos": _("To-do list"),
+            "sync_what_hint": _("PDFs, progress and settings are not synced yet. API keys are never synced."),
+            "sync_first": _("First sync on a new computer"),
+            "sync_first_merge": _("Keep both versions"),
+            "sync_first_local": _("Prefer this computer"),
+            "sync_first_remote": _("Prefer the sync folder"),
+            "sync_first_hint": _("Only applies to pages that exist on both sides and differ. “Keep both” never loses anything."),
+            "sync_save": _("Save settings"),
+            "sync_privacy": _("Use a private repository. Your notes, including pictures, are uploaded to it. Git needs an SSH key or a saved login, because this tab cannot ask for a password."),
+            "sync_never": _("Never synced"),
+            "sync_last": _("Last sync: {time}"),
+            "sync_err_offline": _("No connection. Your changes are saved in the sync folder and will be pushed next time."),
+            "sync_err_auth": _("Git could not sign in. Set up an SSH key or a saved login for this repository."),
+            "sync_err_rejected": _("The remote has newer changes. Pull first, then push again."),
+            "sync_err_timeout": _("Git took too long to answer."),
+            "sync_err_missing": _("The sync folder is not a Git repository. Your data was still exported to the folder."),
+            "sync_err_not_configured": _("Choose a sync folder first."),
+            "sync_err_busy": _("A sync is already running."),
+            "sync_err_flush": _("Your open page could not be saved, so nothing was synced."),
+            "sync_err_save": _("The merged data could not be stored. Your notes are unchanged."),
+            "sync_done_push": _("Pushed."),
+            "sync_done_pull": _("Pulled and merged."),
+            "sync_done": _("Synced."),
+            "sync_updated": _("New data from the other computer was added."),
+            "sync_conflicts": _("{count} pages were changed on both computers. Both versions were kept; the other one is marked “(conflict)”."),
+            "sync_skipped": _("{count} damaged files were skipped."),
+            "sync_untitled": _("Untitled"),
+            "sync_chip_dirty": _("Changes not pushed"),
+            "sync_chip_clean": _("Everything is synced"),
+            "sync_chip_unset": _("Not set up"),
+            "sync_chip_branch": _("Branch {name}"),
+            "sync_chip_ahead": _("{count} to push"),
+            "sync_chip_behind": _("{count} to pull"),
+            "sync_chip_noremote": _("No remote set"),
+            "sync_chip_norepo": _("Not a Git repository"),
+            "sync_chip_nogit": _("Git is not installed"),
+            "sync_running": _("Syncing…"),
+            "sync_new": _("New"),
+            "sync_changed": _("Changed"),
+            "sync_deleted": _("Deleted"),
+            "sync_unpushed": _("{count} saved changes are waiting to be pushed."),
+            "sync_nothing": _("Everything is synced."),
+            "sync_set_up_first": _("Set up a sync folder below to get started."),
+            "sync_saved": _("Settings saved."),
+            "sync_enter_url": _("Enter the repository address first."),
+        },
         "todo": {
             'task_options': _('Task settings'),
             'auto_cleanup': _('Remove completed one-time tasks on the next day'),
@@ -486,6 +555,7 @@ TOOL_FILES = {
     "notebook": "index.html",
     "todo":     "todo.html",
     "pdf":      "pdf_viewer.html",
+    "sync":     "sync.html",
 }
 
 # ──────────────────────────────────────────────
@@ -632,6 +702,10 @@ _NAV_STYLE = """
     opacity: 0.75;
     flex-shrink: 0;
   }
+  .snav-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .snav-btn.snav-dirty { color: #e03e3e; }
+  .snav-btn.snav-dirty .snav-dot { display: inline-block; }
+  body.nightMode .snav-btn.snav-dirty { color: #e05a5a; }
   .snav-spacer { flex: 1; }
   .snav-fs-btn {
     display: flex;
@@ -660,6 +734,7 @@ _NAV_STYLE = """
 _NAV_ICONS = {
     "notebook": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>""",
     "todo":     """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>""",
+    "sync":     """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>""",
     "pdf":      """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>""",
 }
 
@@ -667,6 +742,7 @@ _NAV_LABELS = {
     "notebook": "Notebook",
     "todo":     "Todo",
     "pdf":      "PDF",
+    "sync":     "Changes",
 }
 
 
@@ -727,6 +803,14 @@ def _build_nav_html(active_tool: str, fs_active: bool = False,
             f'onclick="pycmd(\'{ADDON_NAME_FOR_BRIDGE}:switch:{key}\')">'
             f'{icon}{label}</button>'
         )
+    sync_cls = " snav-active" if active_tool == "sync" else ""
+    if _sync_dirty_flag():
+        sync_cls += " snav-dirty"
+    buttons += (
+        f'<button id="snav-sync-btn" class="snav-btn{sync_cls}" '
+        f'onclick="pycmd(\'{ADDON_NAME_FOR_BRIDGE}:switch:sync\')">'
+        f'{_NAV_ICONS["sync"]}{_(_NAV_LABELS["sync"])}<span class="snav-dot"></span></button>'
+    )
     win_title = _("Close Window") if win_active else _("New Window")
     fs_title  = _("Exit Fullscreen") if fs_active else _("Fullscreen")
     win_icon  = _WIN_ICON_CLOSE if win_active else _WIN_ICON
@@ -767,6 +851,10 @@ def _build_nav_toggle_script() -> str:
         '  if (!btn) return;'
         '  btn.innerHTML = active ? __SNAV_ICONS__.fsExit : __SNAV_ICONS__.fs;'
         '  if (t) btn.title = active ? t.fullscreen_exit : t.fullscreen_enter;'
+        '};'
+        'window.__synapseSyncDirty = function(flag) {'
+        '  var btn = document.getElementById("snav-sync-btn");'
+        '  if (btn) btn.classList.toggle("snav-dirty", !!flag);'
         '};'
         'window.__synapseSetWindow = function(active, t) {'
         '  var btn = document.getElementById("snav-win-btn");'
@@ -1749,8 +1837,8 @@ class NotebookPanel(QWidget):
         Python before a tool switch or WebView destruction. This avoids relying on
         a last asynchronous bridge message surviving page teardown.
         """
-        if not self.web or self._load_failed:
-            # The error page has no editable document and must never be saved.
+        if not self.web or self._load_failed or self.current_tool == "sync":
+            # The error page and the sync page have no editable document and must never be saved.
             on_complete(True)
             return
         if self._flush_in_progress:
@@ -2006,7 +2094,7 @@ class NotebookPanel(QWidget):
         if not self.web:
             return
         enabled = workspace_preferences.enabled("notebook")
-        if not enabled.get(tool_name):
+        if tool_name != "sync" and not enabled.get(tool_name):
             tool_name = next(key for key, value in enabled.items() if value)
         self._page_ready = False
         tracker = getattr(self.parent_dock, "_synapse_width", None)
@@ -2065,6 +2153,13 @@ class NotebookPanel(QWidget):
                 f'window.__SYNAPSE_TODO_PRELOAD__={preload_js};'
                 f'window.__SYNAPSE_TODO_AUTO_CLEANUP__={json.dumps(_todo_cleanup_enabled())};'
                 f'</script>'
+            )
+            html = re.sub(r'</head>', lambda m: preload_tag + m.group(0), html,
+                          count=1, flags=re.IGNORECASE)
+        elif tool_name == "sync":
+            preload_tag = (
+                f'<script id="synapse-preload">window.__SYNAPSE_SYNC__='
+                f'{_json_for_script(_get_sync_controller().status())};</script>'
             )
             html = re.sub(r'</head>', lambda m: preload_tag + m.group(0), html,
                           count=1, flags=re.IGNORECASE)
@@ -2333,12 +2428,54 @@ class NotebookPanel(QWidget):
             self._create_pdf_card_batch(body)
         elif payload.startswith("notes:create-batch:"):
             self._create_pdf_card_batch(payload[len("notes:create-batch:"):], notebook=True)
+        elif payload.startswith("sync:"):
+            self._handle_sync_command(payload[len("sync:"):])
         elif payload == "pdf:back":
             self._current_pdf_path = ""
             self._load_tool("pdf")
         elif payload.startswith("pdf:relink:"):
             pdf_id = payload[len("pdf:relink:"):]
             self._relink_pdf_dialog(pdf_id)
+
+    def _handle_sync_command(self, rest: str) -> None:
+        """Messages from the Changes tab: refresh, save, run, choose-folder, clone."""
+        name, _sep, raw = rest.partition(":")
+        try:
+            data = json.loads(raw) if raw else {}
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        controller = _get_sync_controller()
+        if name == "refresh":
+            controller.refresh_status()
+        elif name == "save":
+            controller.save_config(data)
+            controller.refresh_status()
+        elif name == "run":
+            from .sync_service import KINDS
+            kind = data.get("kind")
+            if kind in KINDS:
+                controller.run(kind, done=self._sync_result)
+        elif name == "choose-folder":
+            start = controller.config()["sync_folder"] or os.path.expanduser("~")
+            chosen = QFileDialog.getExistingDirectory(mw, _("Choose the sync folder"), start)
+            if chosen:
+                controller.save_config({"sync_folder": chosen})
+                self._sync_eval(f"if(window.syncFolderChosen) window.syncFolderChosen({json.dumps(chosen)});")
+                controller.refresh_status()
+        elif name == "clone":
+            controller.clone(data.get("url"), done=self._sync_result)
+
+    def _sync_eval(self, js: str) -> None:
+        if self.web and self.current_tool == "sync":
+            try:
+                self.web.eval(js)
+            except Exception:
+                pass
+
+    def _sync_result(self, result: dict) -> None:
+        self._sync_eval(f"if(window.syncResult) window.syncResult({json.dumps(result)});")
 
     def _finish_tool_switch(self, saved: bool) -> None:
         """Open the latest requested tool after the current page is durable."""
@@ -2919,9 +3056,135 @@ def setup_task_calendar():
     QTimer.singleShot(0, _maintain_task_calendar)
 
 
+# ──────────────────────────────────────────────
+# Sync between computers (see sync_service.py)
+# ──────────────────────────────────────────────
+
+class _SyncIO:
+    """Anki side of the sync controller: settings, the notebook database and the visible page."""
+
+    @staticmethod
+    def _package():
+        import importlib
+        return importlib.import_module(__package__)
+
+    @staticmethod
+    def _panel() -> Optional["NotebookPanel"]:
+        panel = _dock.widget() if _dock is not None else None
+        return panel if isinstance(panel, NotebookPanel) else None
+
+    def get_setting(self, key: str, default):
+        return self._package().addon_settings.get(key, default)
+
+    def set_settings(self, values: dict) -> None:
+        package = self._package()
+        package.addon_settings.update(values)
+        package.save_addon_settings()
+
+    def state_path(self) -> str:
+        return os.path.join(mw.pm.profileFolder() or addon_dir(), "SynapsePro_Data", "sync_state.json")
+
+    def read_notebook(self) -> str:
+        return load_latest_note(db_path())
+
+    def read_todos(self) -> str:
+        return load_latest_todos(db_path())
+
+    def write_notebook(self, body: str) -> bool:
+        return _save_snapshot("notes", body, db_path())
+
+    def write_todos(self, body: str) -> bool:
+        saved = _save_snapshot("todos", _normalize_todo_body(body), db_path())
+        if saved:
+            _refresh_dashboard_tasks()
+        return saved
+
+    def flush(self, callback: Callable[[bool], None]) -> None:
+        """Save the page that is open, so the merge starts from everything the user typed."""
+        panel = self._panel()
+        if panel is None or not panel.web or panel.current_tool not in ("notebook", "todo", "pdf"):
+            callback(True)
+        elif panel._flush_in_progress:
+            callback(False)
+        else:
+            panel._flush_current_state(callback)
+
+    def reload(self) -> None:
+        panel = self._panel()
+        if panel is not None and panel.web and panel.current_tool in ("notebook", "todo"):
+            panel._reload_current_tool()
+
+    def run_bg(self, fn, callback) -> None:
+        mw.taskman.run_in_background(fn, lambda future: callback(future.result()))
+
+    def notify(self, status: dict) -> None:
+        panel = self._panel()
+        if panel is None or not panel.web:
+            return
+        try:
+            panel.web.eval(f"if(window.__synapseSyncDirty) window.__synapseSyncDirty({json.dumps(bool(status.get('dirty')))});")
+            if panel.current_tool == "sync":
+                panel.web.eval(f"if(window.syncRender) window.syncRender({json.dumps(status)});")
+        except Exception:
+            pass
+
+
+_sync_controller = None
+
+
+def _get_sync_controller():
+    global _sync_controller
+    if _sync_controller is None:
+        from .sync_service import SyncController
+        _sync_controller = SyncController(_SyncIO())
+    return _sync_controller
+
+
+def _sync_dirty_flag() -> bool:
+    """Whether the Changes tab should be red (last known state; never runs Git)."""
+    return bool(_sync_controller is not None and _sync_controller.dirty)
+
+
+def _sync_autopull_done(result: dict) -> None:
+    error = result.get("error")
+    if result.get("conflicts"):
+        tooltip(_("Sync: some pages were changed on both computers. Both versions were kept, see the Changes tab."))
+    elif error and error[0] in ("auth", "other", "unsafe", "folder", "save"):
+        tooltip(_("Sync could not finish. Open the Changes tab for details."))
+
+
+def _run_sync_autopull() -> None:
+    try:
+        controller = _get_sync_controller()
+        cfg = controller.config()
+        if not cfg["sync_folder"]:
+            return
+        if cfg["sync_auto_pull"]:
+            controller.run("pull", done=_sync_autopull_done)
+        else:
+            controller.refresh_status()
+    except Exception as exc:
+        print(f"Notebook sync start failed: {exc}")
+
+
+def _sync_final_push() -> None:
+    """Push when Anki closes (if enabled). Short timeouts: never hold up closing for long."""
+    try:
+        controller = _get_sync_controller()
+        cfg = controller.config()
+        if cfg["sync_folder"] and cfg["sync_auto_push"]:
+            controller.run("push", run_bg=lambda fn, callback: callback(fn()), flush=False, timeout=10, quiet=True)
+    except Exception as exc:
+        print(f"Notebook sync at close failed: {exc}")
+
+
 def setup_notebook_sidebar():
+    global _sync_controller
     # Verify the pinned offline dependency; never download executable JS at runtime.
     _ensure_pdfjs_async()
+    # A new profile gets a fresh sync controller; pull shortly after start, once Anki has settled.
+    _sync_controller = None
+    QTimer.singleShot(2500, _run_sync_autopull)
 
 
 def _sync_notebook_launcher():
@@ -3048,6 +3311,7 @@ def cleanup_notebook_sidebar():
         _task_maintenance_timer.stop()
     global _dock
     if not _dock:
+        _sync_final_push()
         return
 
     dock_ref = _dock
@@ -3061,6 +3325,8 @@ def cleanup_notebook_sidebar():
         global _dock
         if not saved:
             return
+        # The open page is saved now, so everything the user typed is part of this push.
+        _sync_final_push()
         try:
             mw.removeDockWidget(dock_ref)
         except Exception:

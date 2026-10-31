@@ -205,10 +205,21 @@ class MergeTests(unittest.TestCase):
         with self.assertRaises(ns.SyncError):
             ns.sync_notebook(notebook(page('a')), self.folder, {'device': 'x', 'base': {}})
         other = os.path.join(self.dir.name, 'other')
-        for bad in ('not json', '[]', json.dumps({'blocks': []})):
+        for bad in ('not json', json.dumps([{'type': 'text', 'html': 'old'}]), json.dumps({'blocks': []})):
             with self.assertRaises(ns.SyncError):
                 ns.sync_notebook(bad, other, {'device': 'x', 'base': {}})
         self.assertFalse(os.path.exists(other), 'nothing is written on refusal')
+
+    def test_fresh_empty_database_is_an_empty_notebook(self):
+        laptop = Device(self.folder, '[]')
+        pc = Device(self.folder, notebook(page('a', 'one')))
+        pc.sync()
+        laptop.sync()
+        self.assertEqual(laptop.ids(), ['a'], 'a never-opened notebook receives the remote pages')
+        lonely = Device(os.path.join(self.dir.name, 'other'), '[]')
+        report = lonely.sync()
+        self.assertEqual(lonely.ids(), [])
+        self.assertEqual(report['conflicts'], [])
 
     def test_unchanged_sync_changes_nothing_on_disk(self):
         pc, laptop = self.pair()

@@ -14,7 +14,7 @@ DEFAULT_SIDEBAR_WIDTH = 400
 def width_group(feature):
     if feature in ("mindmap", "roadmap"):
         return "maps"
-    if feature in ("notebook", "todo", "pdf"):
+    if feature in ("notebook", "todo", "pdf", "sync"):
         return "notebook"
     return feature
 

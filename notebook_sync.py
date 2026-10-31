@@ -317,6 +317,8 @@ def sync_notebook(local_body: str, sync_dir: str, state: dict,
         data = json.loads(local_body)
     except (TypeError, ValueError) as exc:
         raise SyncError("The local notebook is not valid JSON.") from exc
+    if data == []:
+        data = {"pages": []}            # a notebook that was never opened (fresh database)
     if not isinstance(data, dict) or not isinstance(data.get("pages"), list):
         raise SyncError("Open the notebook once so it is upgraded to the page format, then sync.")
     collections, extras = {}, {}
@@ -367,4 +369,21 @@ def local_changes(local_body: str, state: dict) -> dict:
         "modified": [{"id": k, "title": title(v)} for k, v in pages.items()
                      if k in base and entry_hash(v) != base[k]],
         "deleted": [{"id": k, "title": ""} for k in base if k not in pages],
+    }
+
+
+def todo_changes(local_body: str, state: dict) -> dict:
+    """Same as local_changes for the to-do list: {added, modified, deleted} with the task text as title."""
+    try:
+        tasks = json.loads(local_body)
+    except (TypeError, ValueError):
+        return {"added": [], "modified": [], "deleted": []}
+    items, _ = _split(tasks)
+    base = state.get("base", {}).get("todos", {}).get("tasks", {})
+    title = lambda task: str(task.get("text") or task.get("title") or "") if isinstance(task, dict) else ""
+    return {
+        "added": [{"id": k, "title": title(v)} for k, v in items.items() if k not in base],
+        "modified": [{"id": k, "title": title(v)} for k, v in items.items()
+                     if k in base and entry_hash(v) != base[k]],
+        "deleted": [{"id": k, "title": ""} for k in base if k not in items],
     }

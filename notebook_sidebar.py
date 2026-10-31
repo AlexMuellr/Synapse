@@ -203,6 +203,11 @@ def _build_i18n_script(tool_name: str) -> str:
             "pink": _("Pink"),
             "red": _("Red"),
             "block_list":         _("List"),
+            "block_numbered":     _("Numbered list"),
+            "block_latex":        _("LaTeX"),
+            "latex_placeholder":  _("Add a LaTeX equation"),
+            "latex_source_placeholder": _("Type LaTeX here"),
+            "latex_error":        _("Invalid LaTeX"),
             "block_todo":         _("To-Do"),
             "block_quote":        _("Quote"),
             "block_callout":      _("Callout"),
@@ -464,6 +469,58 @@ def _pdfjs_local_scripts() -> tuple[str, str]:
     except Exception as exc:
         print(f"SynapsePro: could not read PDF.js local files: {exc}")
         return "", ""
+
+
+_KATEX_PLACEHOLDER = '<script id="synapse-katex-placeholder"></script>'
+_katex_cache: Optional[tuple[str, str]] = None
+
+
+def _katex_dir() -> str:
+    return os.path.join(addon_dir(), "vendor", "katex")
+
+
+def _katex_inline_assets() -> tuple[str, str]:
+    """Return (katex_js, katex_css) with every font embedded as a data: URI.
+
+    The notebook page is loaded with setHtml() (no base URL), so relative
+    ``fonts/…`` URLs cannot resolve. Returns ('', '') if the bundle is missing.
+    """
+    global _katex_cache
+    if _katex_cache is not None:
+        return _katex_cache
+    d = _katex_dir()
+    try:
+        with open(os.path.join(d, "katex.min.js"), "r", encoding="utf-8") as fh:
+            js = fh.read()
+        with open(os.path.join(d, "katex.min.css"), "r", encoding="utf-8") as fh:
+            css = fh.read()
+
+        def embed(match: "re.Match[str]") -> str:
+            name = os.path.basename(match.group(1))
+            with open(os.path.join(d, "fonts", name), "rb") as font:
+                data = base64.b64encode(font.read()).decode("ascii")
+            return f"url(data:font/woff2;base64,{data})"
+
+        css = re.sub(r"url\(\s*(fonts/[^)\s]+\.woff2)\s*\)", embed, css)
+        _katex_cache = (js, css)
+    except Exception as exc:
+        print(f"SynapsePro: could not read bundled KaTeX: {exc}")
+        _katex_cache = ("", "")
+    return _katex_cache
+
+
+def _katex_inline_tags() -> str:
+    """Inert text/plain script tags; the notebook parses KaTeX lazily on first use."""
+    js, css = _katex_inline_assets()
+    if not js or not css:
+        return ""
+    # </ must not close the carrier tag; <\/ is equivalent inside JS literals.
+    safe_js = js.replace("</", "<\\/")
+    safe_css = css.replace("</", "<\\/")
+    return (
+        f'<script id="synapse-katex-js" type="text/plain">{safe_js}</script>'
+        f'<script id="synapse-katex-css" type="text/plain">{safe_css}</script>'
+    )
 
 
 # ──────────────────────────────────────────────
@@ -1921,6 +1978,7 @@ class NotebookPanel(QWidget):
         # we embed the data directly so the page can initialise correctly
         # on first render.
         if tool_name == "notebook":
+            html = html.replace(_KATEX_PLACEHOLDER, _katex_inline_tags(), 1)
             preload_data = load_latest_note(self._database_path)
             preload_js   = _json_for_script(preload_data)
             preload_tag  = f'<script id="synapse-preload">window.__SYNAPSE_PRELOAD__={preload_js};</script>'

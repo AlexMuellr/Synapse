@@ -282,7 +282,7 @@
 
         #editor { min-height: 40px; }
         .block { min-height: 24px; line-height: 1.6; padding: 3px 0; margin-bottom: 2px; font-size: 16px; position: relative; color: var(--text); }
-        .block:not(.bullet):empty:focus::before { content: attr(data-placeholder); color: var(--text-gray); pointer-events: none; opacity: 0.3; position: absolute; }
+        .block:not(.bullet):not(.numbered):empty:focus::before { content: attr(data-placeholder); color: var(--text-gray); pointer-events: none; opacity: 0.3; position: absolute; }
         
         .block.h1 { font-size: 28px; font-weight: 700; margin-top: 24px; }
         .block.h3 { font-size: 18px; font-weight: 600; margin-top: 14px; }
@@ -297,6 +297,65 @@
             color: var(--text);
         }
         
+        .block.numbered { display:block; padding-left:24px; }
+        .block.numbered::before { position:absolute; left:0; top:3px; min-width:20px; pointer-events:none; font-weight:600; color:var(--text); }
+        .block.numbered:not([data-indent]) { counter-increment: nb0; counter-reset: nb1 nb2 nb3 nb4 nb5; }
+        .block.numbered:not([data-indent])::before { content: counter(nb0, decimal) "."; }
+        .block.numbered[data-indent="1"] { counter-increment: nb1; counter-reset: nb2 nb3 nb4 nb5; }
+        .block.numbered[data-indent="1"]::before { content: counter(nb1, lower-alpha) "."; }
+        .block.numbered[data-indent="2"] { counter-increment: nb2; counter-reset: nb3 nb4 nb5; }
+        .block.numbered[data-indent="2"]::before { content: counter(nb2, lower-roman) "."; }
+        .block.numbered[data-indent="3"] { counter-increment: nb3; counter-reset: nb4 nb5; }
+        .block.numbered[data-indent="3"]::before { content: counter(nb3, decimal) "."; }
+        .block.numbered[data-indent="4"] { counter-increment: nb4; counter-reset: nb5; }
+        .block.numbered[data-indent="4"]::before { content: counter(nb4, lower-alpha) "."; }
+        .block.numbered[data-indent="5"] { counter-increment: nb5; }
+        .block.numbered[data-indent="5"]::before { content: counter(nb5, lower-roman) "."; }
+        #editor > [data-indent="1"] { margin-left: 24px; }
+        #editor > [data-indent="2"] { margin-left: 48px; }
+        #editor > [data-indent="3"] { margin-left: 72px; }
+        #editor > [data-indent="4"] { margin-left: 96px; }
+        #editor > [data-indent="5"] { margin-left: 120px; }
+        .block.bullet[data-indent="1"]::before, .block.bullet[data-indent="4"]::before { content: "◦"; }
+        .block.bullet[data-indent="2"]::before, .block.bullet[data-indent="5"]::before { content: "▪"; }
+        #editor > :not(.numbered):not(.bullet):not(.todo-wrapper) { counter-reset: nb0 nb1 nb2 nb3 nb4 nb5; }
+        #editor > .bullet:not([data-indent]), #editor > .todo-wrapper:not([data-indent]) { counter-reset: nb1 nb2 nb3 nb4 nb5; }
+        #editor > .bullet[data-indent="1"], #editor > .todo-wrapper[data-indent="1"] { counter-reset: nb2 nb3 nb4 nb5; }
+        #editor > .bullet[data-indent="2"], #editor > .todo-wrapper[data-indent="2"] { counter-reset: nb3 nb4 nb5; }
+        #editor > .bullet[data-indent="3"], #editor > .todo-wrapper[data-indent="3"] { counter-reset: nb4 nb5; }
+        #editor > .bullet[data-indent="4"], #editor > .todo-wrapper[data-indent="4"] { counter-reset: nb5; }
+        #editor > .bullet[data-indent="5"], #editor > .todo-wrapper[data-indent="5"] { counter-reset: none; }
+        
+        .block.latex-block { padding: 4px 6px; }
+        .latex-preview { text-align: center; padding: 8px 6px; min-height: 28px; overflow-x: auto; border-radius: 6px; cursor: pointer; outline: none; }
+        .latex-block:hover .latex-preview, .latex-preview:focus-visible { background: var(--hover-bg); }
+        .latex-preview.empty { color: var(--text-gray); font-size: 14px; }
+        .latex-block.editing .latex-preview { cursor: default; background: none; }
+        .latex-source { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; outline: none; color: var(--text); background: var(--hover-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .latex-block:not(.editing) .latex-source { display: none; }
+        .latex-error { color: #b75e5e; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 2px 6px; white-space: pre-wrap; }
+        .latex-error[hidden] { display: none; }
+        .latex-preview .katex-display { margin: 0.2em 0; }
+
+        /* Stored colors are theme independent; show readable variants in Anki's dark mode. */
+        body.nightMode #editor [style*="color: rgb(120, 119, 116)"], body.nightMode #notebook-popup [style*="color: rgb(120, 119, 116)"] { color: #979a9b !important; }
+        body.nightMode #editor [style*="color: rgb(159, 107, 83)"], body.nightMode #notebook-popup [style*="color: rgb(159, 107, 83)"] { color: #b9856f !important; }
+        body.nightMode #editor [style*="color: rgb(217, 115, 13)"], body.nightMode #notebook-popup [style*="color: rgb(217, 115, 13)"] { color: #ffa344 !important; }
+        body.nightMode #editor [style*="color: rgb(181, 138, 0)"], body.nightMode #notebook-popup [style*="color: rgb(181, 138, 0)"] { color: #ffdc49 !important; }
+        body.nightMode #editor [style*="color: rgb(15, 123, 108)"], body.nightMode #notebook-popup [style*="color: rgb(15, 123, 108)"] { color: #4dab9a !important; }
+        body.nightMode #editor [style*="color: rgb(11, 110, 153)"], body.nightMode #notebook-popup [style*="color: rgb(11, 110, 153)"] { color: #529cca !important; }
+        body.nightMode #editor [style*="color: rgb(105, 64, 165)"], body.nightMode #notebook-popup [style*="color: rgb(105, 64, 165)"] { color: #a37bdc !important; }
+        body.nightMode #editor [style*="color: rgb(173, 57, 115)"], body.nightMode #notebook-popup [style*="color: rgb(173, 57, 115)"] { color: #e255a1 !important; }
+        body.nightMode #editor [style*="color: rgb(197, 61, 61)"], body.nightMode #notebook-popup [style*="color: rgb(197, 61, 61)"] { color: #ff7369 !important; }
+        body.nightMode #editor [style*="background-color: rgb(233, 233, 231)"], body.nightMode #notebook-popup [style*="background-color: rgb(233, 233, 231)"] { background-color: #454b4e !important; }
+        body.nightMode #editor [style*="background-color: rgb(238, 224, 218)"], body.nightMode #notebook-popup [style*="background-color: rgb(238, 224, 218)"] { background-color: #434040 !important; }
+        body.nightMode #editor [style*="background-color: rgb(250, 227, 203)"], body.nightMode #notebook-popup [style*="background-color: rgb(250, 227, 203)"] { background-color: #594a3a !important; }
+        body.nightMode #editor [style*="background-color: rgb(255, 240, 179)"], body.nightMode #notebook-popup [style*="background-color: rgb(255, 240, 179)"] { background-color: #59563b !important; }
+        body.nightMode #editor [style*="background-color: rgb(217, 238, 228)"], body.nightMode #notebook-popup [style*="background-color: rgb(217, 238, 228)"] { background-color: #354c4b !important; }
+        body.nightMode #editor [style*="background-color: rgb(217, 234, 250)"], body.nightMode #notebook-popup [style*="background-color: rgb(217, 234, 250)"] { background-color: #364954 !important; }
+        body.nightMode #editor [style*="background-color: rgb(233, 223, 244)"], body.nightMode #notebook-popup [style*="background-color: rgb(233, 223, 244)"] { background-color: #443f57 !important; }
+        body.nightMode #editor [style*="background-color: rgb(245, 221, 235)"], body.nightMode #notebook-popup [style*="background-color: rgb(245, 221, 235)"] { background-color: #533b4c !important; }
+        body.nightMode #editor [style*="background-color: rgb(249, 220, 220)"], body.nightMode #notebook-popup [style*="background-color: rgb(249, 220, 220)"] { background-color: #594141 !important; }
         .block.quote { border-left: 3px solid var(--text); padding-left: 14px; font-style: italic; opacity: 0.8; }
         
         .block.code { 
@@ -720,6 +779,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         #image-toolbar { max-width:calc(100vw - 8px);flex-wrap:wrap; }
         #image-toolbar .tbl-btn { white-space:nowrap; }
 </style>
+    <script id="synapse-katex-placeholder"></script>
 </head>
 <body>
 
@@ -745,6 +805,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 <div class="cmenu-item" onclick="convertSelectedBlocks('h2')" data-i18n="block_h2">Heading 2</div>
                 <div class="cmenu-item" onclick="convertSelectedBlocks('h3')" data-i18n="block_h3">Heading 3</div>
                 <div class="cmenu-item" onclick="convertSelectedBlocks('bullet')" data-i18n="block_list">List</div>
+                <div class="cmenu-item" onclick="convertSelectedBlocks('numbered')" data-i18n="block_numbered">Numbered list</div>
                 <div class="cmenu-item" onclick="convertSelectedBlocks('todo')" data-i18n="block_todo">To-Do</div>
                 <div class="cmenu-item" onclick="convertSelectedBlocks('quote')" data-i18n="block_quote">Quote</div>
                 <div class="cmenu-item" onclick="convertSelectedBlocks('callout')" data-i18n="block_callout">Callout</div>
@@ -848,10 +909,12 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         <div class="menu-item" onclick="convertBlock('h2')"><span data-i18n="block_h2">Heading 2</span> <span class="menu-shortcut">/h2</span></div>
         <div class="menu-item" onclick="convertBlock('h3')"><span data-i18n="block_h3">Heading 3</span> <span class="menu-shortcut">/h3</span></div>
         <div class="menu-item" onclick="convertBlock('bullet')"><span data-i18n="block_list">List</span> <span class="menu-shortcut">/list</span></div>
+        <div class="menu-item" onclick="convertBlock('numbered')"><span data-i18n="block_numbered">Numbered list</span> <span class="menu-shortcut">/numbered</span></div>
         <div class="menu-item" onclick="convertBlock('todo')"><span data-i18n="block_todo">To-Do</span> <span class="menu-shortcut">/todo</span></div>
         <div class="menu-item" onclick="convertBlock('quote')"><span data-i18n="block_quote">Quote</span> <span class="menu-shortcut">/quote</span></div>
         <div class="menu-item" onclick="convertBlock('callout')"><span data-i18n="block_callout">Callout</span> <span class="menu-shortcut">/callout</span></div>
         <div class="menu-item" onclick="convertBlock('code')"><span data-i18n="block_code">Code</span> <span class="menu-shortcut">/code</span></div>
+        <div class="menu-item" data-alias="math formel formula equation tex" onclick="convertBlock('latex')"><span data-i18n="block_latex">LaTeX</span> <span class="menu-shortcut">/latex</span></div>
         <div class="menu-item" onclick="convertBlock('toggle')"><span data-i18n="block_toggle">Toggle</span> <span class="menu-shortcut">/toggle</span></div>
         <div class="menu-item" onclick="convertBlock('divider')"><span data-i18n="block_divider">Divider</span> <span class="menu-shortcut">/div</span></div>
         <div class="menu-item" onclick="convertBlock('table')"><span data-i18n="block_table">Table</span> <span class="menu-shortcut">/table</span></div>
@@ -1161,6 +1224,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                     const table=child.querySelector('table'),baseline=notebookTableBaseline.get(child);
                     const html=stored && baseline===table.innerHTML ? stored.data.html : sanitizeUserHtml(table.innerHTML);
                     blocks.push({type:'table',html,...(notebookTableOptions.has(child)?{tableOptions:JSON.parse(JSON.stringify(notebookTableOptions.get(child)))}:{})});
+                } else if (child.classList.contains('latex-block')) {
+                    blocks.push({ type: 'latex', html: '', latex: child.querySelector('.latex-source').value });
                 } else if (child.classList.contains('callout')) {
                     blocks.push({ type: 'callout', html: sanitizeUserHtml(child.querySelector('.callout-content').innerHTML) });
                 } else if (child.classList.contains('toggle')) {
@@ -1176,6 +1241,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                     if (child.classList.contains('h2')) type = 'h2';
                     if (child.classList.contains('h3')) type = 'h3';
                     if (child.classList.contains('bullet')) type = 'bullet';
+                    if (child.classList.contains('numbered')) type = 'numbered';
                     if (child.classList.contains('quote')) type = 'quote';
                     if (child.classList.contains('code')) type = 'code';
                     blocks.push({ type: stored?.data.type || type, html: sanitizeUserHtml(child.innerHTML) });
@@ -1185,6 +1251,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                         if (typeof stored.data[key] === 'string' && blocks[start][key] === sanitizeUserHtml(stored.data[key])) blocks[start][key] = stored.data[key];
                     }
                     blocks[start] = { ...stored.data, ...blocks[start] };
+                }
+                if (blocks.length > start && notebookListBlock(child)) {
+                    const indent = notebookIndentOf(child);
+                    if (indent) blocks[start].indent = indent; else delete blocks[start].indent;
                 }
                 if (blocks.length > start) {storedBlocks.set(child, { data: blocks[start], signature: blockSignature(child) });if(child.classList.contains('table-container'))notebookTableBaseline.set(child,child.querySelector('table').innerHTML);}
             });
@@ -1871,6 +1941,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         }
 
         function blockSignature(block) {
+            // The rendered preview is derived state; only the source defines a LaTeX block.
+            if (block.classList.contains('latex-block')) return 'latex|' + block.querySelector('.latex-source').value;
             const copy = block.cloneNode(true);
             copy.classList.remove('block-selected', 'nb-hover');
             copy.querySelectorAll('mark.search-highlight').forEach(mark => mark.replaceWith(...mark.childNodes));
@@ -1897,6 +1969,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                     field.title = i18nGet('protected_content', 'Original content preserved. This block contains content that cannot be safely edited here.');
                 }
             }
+            if (notebookListBlock(block)) notebookSetIndent(block, data.indent);
+            if (block.classList.contains('latex-block')) notebookLatexSet(block, typeof data.latex === 'string' ? data.latex : '');
             if(block.classList.contains('table-container')){notebookApplyTableOptions(block,data.tableOptions);notebookTableBaseline.set(block,block.querySelector('table').innerHTML);}
             // Record the DOM after applying the read-only protection.
             storedBlocks.set(block, { data: JSON.parse(JSON.stringify(data)), signature: blockSignature(block) });
@@ -1910,23 +1984,31 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 return title + (body ? '<div>' + body + '</div>' : '');
             }
             if (block.classList.contains('table-container')) return block.querySelector('table').outerHTML;
-            if (block.classList.contains('divider')) return '';
+            if (block.classList.contains('divider') || block.classList.contains('latex-block')) return '';
             return (block.querySelector('.todo-content, .callout-content') || block).innerHTML;
         }
 
         function convertedBlock(block, type, html = blockHtml(block)) {
             // Never turn nonempty content into a structural block with no text slot.
             if ((type === 'divider' || type === 'table') && html.trim()) return null;
+            // Converting away from a filled formula would hide its source.
+            if (type !== 'latex' && block.classList.contains('latex-block') && block.querySelector('.latex-source').value.trim()) return null;
             const previous = storedBlocks.get(block)?.data || {};
             if (['html', 'body'].some(key => typeof previous[key] === 'string' && userHtmlWasFiltered(previous[key]))) return null;
-            if (previous.type && !['text','h1','h2','h3','bullet','todo','quote','callout','code','toggle','table','divider'].includes(previous.type)) return null;
+            if (previous.type && !['text','h1','h2','h3','bullet','numbered','todo','quote','callout','code','toggle','table','divider','latex'].includes(previous.type)) return null;
             if (type === 'toggle' && block.classList.contains('toggle')) return createStoredBlock(previous);
-            return createStoredBlock({ ...previous, type, html, ...(type === 'toggle' ? {body: '', open: true} : {}) });
+            const converted = { ...previous, type, html, ...(type === 'toggle' ? {body: '', open: true} : {}) };
+            if (type === 'latex') { const holder = document.createElement('div'); holder.innerHTML = html; converted.latex = holder.textContent; converted.html = ''; }
+            else delete converted.latex;
+            // Nesting only belongs to list items; carry the live level across list conversions.
+            const indent = notebookListBlock(block) ? notebookIndentOf(block) : 0;
+            if (['bullet','numbered','todo'].includes(type) && indent) converted.indent = indent; else delete converted.indent;
+            return createStoredBlock(converted);
         }
 
-        function stripCommandPrefix(html) {
+        function stripCommandPrefix(html, numbered = false) {
             const holder = document.createElement('div'); holder.innerHTML = html;
-            const match = holder.textContent.match(/^(?:### |## |# |- |\[\] |> |\/[a-z]+ ?)/i);
+            const match = holder.textContent.match(numbered ? /^(?:1\. )/ : /^(?:### |## |# |- |\[\] |> |\/[a-z]+ ?)/i);
             if (!match) return html;
             let remaining = match[0].length;
             const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
@@ -1937,12 +2019,114 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return holder.innerHTML;
         }
 
+        // --- LaTeX blocks: the source is stored; KaTeX (bundled, loaded lazily) renders the preview ---
+        const NOTEBOOK_LATEX_LIMIT = 12000;
+        let notebookKatexPromise = null;
+        function notebookLoadKatex() {
+            if (window.katex) return Promise.resolve(window.katex);
+            if (notebookKatexPromise) return notebookKatexPromise;
+            notebookKatexPromise = new Promise((resolve, reject) => {
+                try {
+                    const js = document.getElementById('synapse-katex-js'), css = document.getElementById('synapse-katex-css');
+                    if (js && css) {
+                        const style = document.createElement('style'); style.textContent = css.textContent; document.head.appendChild(style);
+                        const script = document.createElement('script'); script.textContent = js.textContent; document.head.appendChild(script);
+                        if (window.katex) resolve(window.katex); else reject(new Error('KaTeX unavailable'));
+                    } else {
+                        // Standalone page (no inlined assets): use the add-on's local copy.
+                        const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '../vendor/katex/katex.min.css'; document.head.appendChild(link);
+                        const script = document.createElement('script'); script.src = '../vendor/katex/katex.min.js';
+                        script.onload = () => window.katex ? resolve(window.katex) : reject(new Error('KaTeX unavailable'));
+                        script.onerror = () => reject(new Error('KaTeX unavailable'));
+                        document.head.appendChild(script);
+                    }
+                } catch (err) { reject(err); }
+            });
+            notebookKatexPromise.catch(() => { notebookKatexPromise = null; });
+            return notebookKatexPromise;
+        }
+        function notebookLatexRender(block) {
+            const source = block.querySelector('.latex-source').value, preview = block.querySelector('.latex-preview'), error = block.querySelector('.latex-error');
+            const token = block._latexToken = (block._latexToken || 0) + 1;
+            const fail = message => { error.textContent = i18nGet('latex_error', 'Invalid LaTeX') + (message ? ': ' + message : ''); error.hidden = false; };
+            error.hidden = true; error.textContent = '';
+            preview.classList.toggle('empty', !source.trim());
+            if (!source.trim()) { preview.textContent = i18nGet('latex_placeholder', 'Add a LaTeX equation'); return; }
+            if (source.length > NOTEBOOK_LATEX_LIMIT) { preview.textContent = source; fail(''); return; }
+            notebookLoadKatex().then(katex => {
+                if (token !== block._latexToken) return;
+                try {
+                    preview.innerHTML = katex.renderToString(source, {displayMode: true, throwOnError: true, trust: false, maxExpand: 500, maxSize: 20, strict: 'ignore'});
+                } catch (err) { preview.textContent = source; fail(String(err && err.message || err).replace(/^KaTeX parse error:\s*/, '')); }
+            }, () => { if (token === block._latexToken) { preview.textContent = source; fail(''); } });
+        }
+        function notebookLatexSize(block) {
+            const field = block.querySelector('.latex-source'); field.style.height = 'auto'; field.style.height = field.scrollHeight + 2 + 'px';
+        }
+        function notebookLatexEdit(block) {
+            block.classList.add('editing');
+            const field = block.querySelector('.latex-source');
+            notebookLatexSize(block); field.focus(); field.setSelectionRange(field.value.length, field.value.length);
+            notebookLatexRender(block);
+        }
+        function notebookLatexView(block, focusPreview) {
+            block.classList.remove('editing');
+            notebookLatexRender(block);
+            if (focusPreview) block.querySelector('.latex-preview').focus();
+        }
+        function notebookLatexSet(block, source) {
+            const field = block.querySelector('.latex-source');
+            field.value = source; field.defaultValue = source;
+            block.classList.toggle('editing', !source.trim());
+            notebookLatexRender(block);
+        }
+        function notebookCreateLatexBlock() {
+            const block = document.createElement('div'); block.className = 'block latex-block editing'; block.contentEditable = false;
+            const field = document.createElement('textarea'); field.className = 'latex-source'; field.rows = 1; field.spellcheck = false;
+            field.placeholder = i18nGet('latex_source_placeholder', 'Type LaTeX here');
+            const preview = document.createElement('div'); preview.className = 'latex-preview'; preview.tabIndex = 0; preview.setAttribute('role', 'button');
+            const error = document.createElement('div'); error.className = 'latex-error'; error.hidden = true; error.setAttribute('role', 'alert');
+            block.append(field, preview, error);
+            const neighbour = forward => {
+                const target = notebookEditable(forward ? block.nextElementSibling : block.previousElementSibling);
+                if (!target || target.contentEditable !== 'true') return false;
+                if (forward) { target.focus(); const r = document.createRange(); r.selectNodeContents(target); r.collapse(true); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } else setCaretEnd(target);
+                return true;
+            };
+            field.addEventListener('input', () => { field.defaultValue = field.value; notebookLatexSize(block); notebookLatexRender(block); triggerSave(); });
+            field.addEventListener('keydown', e => {
+                if (e.isComposing) return;
+                const mod = e.ctrlKey || e.metaKey;
+                if (mod && ['z', 'y'].includes(e.key.toLowerCase())) { e.stopPropagation(); return; } // native undo inside the field
+                if (e.key === 'Escape' || (mod && e.key === 'Enter')) { e.preventDefault(); e.stopPropagation(); notebookLatexView(block, true); return; }
+                if (e.key === 'Backspace' && !field.value && editor.children.length > 1) {
+                    e.preventDefault(); pushUndoSnapshot();
+                    const before = block.previousElementSibling; block.remove(); triggerSave();
+                    if (before) { const target = notebookEditable(before); if (target && target.contentEditable === 'true') setCaretEnd(target); }
+                    return;
+                }
+                if (e.key === 'ArrowUp' && field.selectionStart === 0 && field.selectionEnd === 0 && neighbour(false)) e.preventDefault();
+                if (e.key === 'ArrowDown' && field.selectionStart === field.value.length && field.selectionEnd === field.value.length && neighbour(true)) e.preventDefault();
+            });
+            block.addEventListener('focusout', e => {
+                if (block.classList.contains('editing') && field.value.trim() && !block.contains(e.relatedTarget)) notebookLatexView(block, false);
+            });
+            preview.addEventListener('click', () => { if (!block.classList.contains('editing')) notebookLatexEdit(block); });
+            preview.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); notebookLatexEdit(block); }
+                else if (e.key === 'ArrowDown' && neighbour(true)) e.preventDefault();
+                else if (e.key === 'ArrowUp' && neighbour(false)) e.preventDefault();
+            });
+            return block;
+        }
+
         function createBlock(type = 'text', content = '', checked = false, open = true, body = '') {
             content = sanitizeUserHtml(content);
             body = sanitizeUserHtml(body);
             if (type === 'divider') {
                 const div = document.createElement('div'); div.className = 'block divider'; div.contentEditable = false; div.innerHTML = '<hr>'; div.onclick = null; return div;
             }
+            if (type === 'latex') return notebookCreateLatexBlock();
             if (type === 'table') {
                 const container = document.createElement('div'); container.className = 'block table-container'; container.contentEditable = false; 
                 const controls = document.createElement('div'); controls.className = 'table-controls';
@@ -2133,10 +2317,12 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             if (text === '/table' || text === '/table ') { el.innerText = ''; replaceWithType(el, 'table'); return;}
             if (text === '/code' || text === '/code ') { el.innerText = ''; replaceWithType(el, 'code'); return;}
             if (text === '/callout' || text === '/callout ') { el.innerText = ''; replaceWithType(el, 'callout'); return;}
+            if (['/latex', '/math', '/formel'].some(cmd => text === cmd || text === cmd + ' ')) { el.innerText = ''; menu.style.display = 'none'; replaceWithType(el, 'latex'); return; }
             if (text.startsWith('### ')) replaceWithType(el, 'h3');
             else if (text.startsWith('# ')) replaceWithType(el, 'h1');
             else if (text.startsWith('## ')) replaceWithType(el, 'h2');
             else if (text.startsWith('- ') || text === '/list' || text === '/list ') replaceWithType(el, 'bullet');
+            else if (text.startsWith('1. ') || text === '/numbered' || text === '/numbered ') replaceWithType(el, 'numbered', text.startsWith('1. '));
             else if (text.startsWith('[] ') || text === '/todo' || text === '/todo ') replaceWithType(el, 'todo');
             else if (text.startsWith('> ') || text === '/quote' || text === '/quote ') replaceWithType(el, 'quote');
             
@@ -2150,7 +2336,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                     Array.from(menu.children).forEach(item => {
                         if (item.classList.contains('menu-footer')) return;
                         const txt = item.innerText.toLowerCase();
-                        item.style.display = txt.includes(cmd) ? 'flex' : 'none';
+                        const aliases = (item.dataset.alias || '').split(' ');
+                        item.style.display = txt.includes(cmd) || aliases.some(alias => alias && alias.startsWith(cmd)) ? 'flex' : 'none';
                     });
                 }
             } else { menu.style.display = 'none'; }
@@ -2181,13 +2368,14 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 }
             }
             const next=createBlock(type,trailing.innerHTML);block.after(next);
+            if(notebookListBlock(block)&&notebookListBlock(next))notebookSetIndent(next,notebookIndentOf(block));
             const target=notebookEditable(next);target.focus();const caret=document.createRange();caret.selectNodeContents(target);caret.collapse(true);selection.removeAllRanges();selection.addRange(caret);
             triggerSave();return true;
         }
         function notebookMergePrevious(block) {
             const previous=block.previousElementSibling,field=notebookEditable(block),target=notebookEditable(previous);
             if(!previous || !target || target.contentEditable!=='true' || !notebookCaretBoundary(field,false))return false;
-            const supported=el=>el?.matches('.block:not(.toggle):not(.callout):not(.code):not(.divider):not(.table-container)') && ['text','h1','h2','h3','bullet','quote'].includes(storedBlocks.get(el)?.data.type||'text');
+            const supported=el=>el?.matches('.block:not(.toggle):not(.callout):not(.code):not(.divider):not(.table-container)') && ['text','h1','h2','h3','bullet','numbered','quote'].includes(storedBlocks.get(el)?.data.type||'text');
             const saved=storedBlocks.get(block)?.data;
             // Structural/unknown metadata stays attached to its block. Never discard it in a merge.
             if(!supported(block)||!supported(previous)||(saved&&Object.keys(saved).some(key=>!['type','html'].includes(key)))){
@@ -2199,17 +2387,78 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             block.remove();target.focus();const selection=window.getSelection();selection.removeAllRanges();selection.addRange(anchor);
             triggerSave();return true;
         }
+        // --- Nested list items: a flat `indent` level per bullet/numbered/todo block ---
+        const NOTEBOOK_MAX_INDENT = 5;
+        const notebookListBlock = el => !!el && el.classList && (el.classList.contains('bullet') || el.classList.contains('numbered') || el.classList.contains('todo-wrapper'));
+        const notebookIndentOf = el => Math.min(NOTEBOOK_MAX_INDENT, Math.max(0, parseInt(el?.dataset?.indent, 10) || 0));
+        function notebookSetIndent(el, level) {
+            level = Math.min(NOTEBOOK_MAX_INDENT, Math.max(0, parseInt(level, 10) || 0));
+            if (level) el.dataset.indent = level; else el.removeAttribute('data-indent');
+        }
+        function notebookIndentTargets(currentEl) {
+            if (selectedBlocks.size) {
+                const children = Array.from(editor.children);
+                return [...selectedBlocks].sort((a, b) => a - b).map(i => children[i]).filter(Boolean);
+            }
+            return [currentEl];
+        }
+        // Moves the given list items (plus their nested children) one level; returns whether anything changed.
+        function notebookIndentBlocks(blocks, delta) {
+            const children = Array.from(editor.children);
+            const moving = new Set();
+            blocks.filter(notebookListBlock).forEach(block => {
+                moving.add(block);
+                const base = notebookIndentOf(block);
+                for (let next = block.nextElementSibling; notebookListBlock(next) && notebookIndentOf(next) > base; next = next.nextElementSibling) moving.add(next);
+            });
+            const ordered = children.filter(el => moving.has(el));
+            if (!ordered.length) return false;
+            const plan = [];
+            if (delta > 0) {
+                let i = 0;
+                while (i < ordered.length) {
+                    let j = i;
+                    while (j + 1 < ordered.length && ordered[j + 1] === ordered[j].nextElementSibling) j++;
+                    const run = ordered.slice(i, j + 1), previous = run[0].previousElementSibling;
+                    if (notebookListBlock(previous) && notebookIndentOf(run[0]) <= notebookIndentOf(previous)
+                        && Math.max(...run.map(notebookIndentOf)) < NOTEBOOK_MAX_INDENT) run.forEach(el => plan.push([el, notebookIndentOf(el) + 1]));
+                    i = j + 1;
+                }
+            } else {
+                ordered.forEach(el => { if (notebookIndentOf(el) > 0) plan.push([el, notebookIndentOf(el) - 1]); });
+            }
+            if (!plan.length) return false;
+            pushUndoSnapshot();
+            plan.forEach(([el, level]) => notebookSetIndent(el, level));
+            // A level can never exceed one more than the item above it.
+            children.forEach((el, k) => {
+                if (!notebookListBlock(el)) return;
+                const prev = children[k - 1], cap = notebookListBlock(prev) ? notebookIndentOf(prev) + 1 : 0;
+                if (notebookIndentOf(el) > cap) notebookSetIndent(el, cap);
+            });
+            triggerSave();
+            return true;
+        }
+
         function handleKeydown(e, currentEl) {
             if(e.isComposing || e.defaultPrevented)return;
             if((e.key==='ArrowUp'||e.key==='ArrowDown')&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
                 const end=e.key==='ArrowDown',field=notebookEditable(currentEl);
                 if(notebookCaretBoundary(field,end)){
                     const sibling=end?currentEl.nextElementSibling:currentEl.previousElementSibling,target=notebookEditable(sibling);
+                    if(sibling?.classList.contains('latex-block')){e.preventDefault();sibling.querySelector('.latex-preview').focus();return;}
                     if(target&&target.contentEditable==='true'){
                         e.preventDefault();if(end){target.focus();const r=document.createRange();r.selectNodeContents(target);r.collapse(true);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);}else setCaretEnd(target);
                         return;
                     }
                 }
+            }
+            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && menu.style.display !== 'block') {
+                const targets = notebookIndentTargets(currentEl);
+                if (targets.some(notebookListBlock)) { e.preventDefault(); notebookIndentBlocks(targets, e.shiftKey ? -1 : 1); return; }
+            }
+            if (e.key === 'Backspace' && notebookListBlock(currentEl) && notebookIndentOf(currentEl) > 0 && notebookCaretBoundary(notebookEditable(currentEl), false)) {
+                e.preventDefault(); notebookIndentBlocks([currentEl], -1); return;
             }
             if(e.key==='Backspace' && notebookCaretBoundary(notebookEditable(currentEl),false) && notebookEditable(currentEl)?.innerText.trim() && notebookMergePrevious(currentEl)){e.preventDefault();return;}
 
@@ -2227,10 +2476,12 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 e.preventDefault();
                 let nextType = 'text';
                 if(currentEl.classList.contains('bullet')) nextType = 'bullet';
+                if(currentEl.classList.contains('numbered')) nextType = 'numbered';
                 if(currentEl.classList.contains('todo-wrapper')) nextType = 'todo';
                 
                 const listContent = currentEl.querySelector('.todo-content') || currentEl;
                 if (nextType !== 'text' && !listContent.innerText.trim() && !listContent.querySelector('img,svg,video,audio,iframe,object,table,input')) {
+                    if (notebookIndentOf(currentEl) > 0) { notebookIndentBlocks([currentEl], -1); return; }
                     pushUndoSnapshot();
                     const textBlock = createBlock('text'); currentEl.replaceWith(textBlock);
                     textBlock.focus(); triggerSave(); return;
@@ -2240,8 +2491,9 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             if (e.key === 'Backspace') {
                 const contentEl = currentEl.querySelector('.todo-content') || currentEl.querySelector('.callout-content') || currentEl;
                 if ((contentEl.innerText === '' || contentEl.innerText === '\n') && !contentEl.querySelector('img,svg,video,audio,iframe,object,table,input')) {
-                     if (currentEl.classList.contains('bullet') || currentEl.classList.contains('todo-wrapper')) {
+                     if (notebookListBlock(currentEl)) {
                          e.preventDefault();
+                         if (notebookIndentOf(currentEl) > 0) { notebookIndentBlocks([currentEl], -1); return; }
                          pushUndoSnapshot();
                          const textBlock = createBlock('text');
                          currentEl.replaceWith(textBlock);
@@ -2266,7 +2518,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                         if(prev) {
                              if(prev.classList.contains('todo-wrapper')) setCaretEnd(prev.querySelector('.todo-content'));
                              else if(prev.classList.contains('divider')) prev.remove();
-                             else if(prev.classList.contains('table-container') || prev.classList.contains('callout')) {} 
+                             else if(prev.classList.contains('table-container') || prev.classList.contains('callout') || prev.classList.contains('latex-block')) {} 
                              else setCaretEnd(prev);
                         }
                         triggerSave();
@@ -2275,10 +2527,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
         }
 
-        function replaceWithType(el, type) {
+        function replaceWithType(el, type, numberedPrefix = false) {
             pushUndoSnapshot();
             let parent = el.closest('.block') || el.closest('.todo-wrapper');
-            const content = stripCommandPrefix(blockHtml(parent));
+            const content = stripCommandPrefix(blockHtml(parent), numberedPrefix);
             const newBlock = convertedBlock(parent, type, content);
             if (!newBlock) return;
             parent.replaceWith(newBlock);
@@ -2288,6 +2540,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
             else if (type === 'toggle') { const next = createBlock('text'); newBlock.after(next); newBlock.querySelector('.toggle-title').focus(); }
             else if (type === 'divider' || type === 'table') { const next = createBlock('text'); newBlock.after(next); next.focus(); }
+            else if (type === 'latex') { const next = createBlock('text'); newBlock.after(next); notebookLatexEdit(newBlock); }
             else newBlock.focus();
             triggerSave();
         }
@@ -2309,6 +2562,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
             else if(type==='toggle') { const next = createBlock('text'); newBlock.after(next); newBlock.querySelector('.toggle-title').focus(); }
             else if(type==='divider' || type === 'table') { const next = createBlock('text'); newBlock.after(next); next.focus(); }
+            else if(type==='latex') { const next = createBlock('text'); newBlock.after(next); notebookLatexEdit(newBlock); }
             else newBlock.focus();
             triggerSave();
         }
@@ -2546,6 +2800,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         document.addEventListener('keydown', e => {
             if (e.isComposing || e.defaultPrevented) return;
             const key = e.key.toLowerCase();
+            if (key === 'tab' && !e.ctrlKey && !e.metaKey && !e.altKey && selectedBlocks.size && !e.target.closest?.('input,textarea,select')) {
+                const targets = notebookIndentTargets(null);
+                if (targets.some(notebookListBlock)) { e.preventDefault(); notebookIndentBlocks(targets, e.shiftKey ? -1 : 1); return; }
+            }
             if ((e.ctrlKey || e.metaKey) && !e.altKey && key === 'f') {
                 e.preventDefault(); e.stopPropagation(); searchInput.focus(); searchInput.select(); return;
             }
@@ -3237,8 +3495,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         notebookPopup.setAttribute('role', 'dialog');
         document.body.appendChild(notebookPopup);
         let notebookHoveredBlock = null, notebookEditingBlock = null, notebookActionBlock = null, notebookRange = null;
-        const notebookTypes = ['text', 'h1', 'h2', 'h3', 'bullet', 'todo', 'quote', 'callout', 'code', 'toggle'];
-        const notebookTypeLabel = type => i18nGet('block_' + (type === 'bullet' ? 'list' : type), ({text:'Text',h1:'Heading 1',h2:'Heading 2',h3:'Heading 3',bullet:'List',todo:'To-Do',quote:'Quote',callout:'Callout',code:'Code',toggle:'Toggle'})[type] || type);
+        const notebookTypes = ['text', 'h1', 'h2', 'h3', 'bullet', 'numbered', 'todo', 'quote', 'callout', 'code', 'toggle'];
+        const notebookTypeLabel = type => i18nGet('block_' + (type === 'bullet' ? 'list' : type), ({text:'Text',h1:'Heading 1',h2:'Heading 2',h3:'Heading 3',bullet:'List',numbered:'Numbered list',latex:'LaTeX',todo:'To-Do',quote:'Quote',callout:'Callout',code:'Code',toggle:'Toggle'})[type] || type);
 
         function notebookPlacePopup(anchor) {
             notebookPopup.style.display = 'block';
@@ -3437,6 +3695,46 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
             notebookPlacePopup(anchor);
         }
+        // Colors are inline <span style> wrappers around the selected words. The selection is split per
+        // editable field (blocks are separate contenteditables) and any earlier color of the same kind
+        // inside it is removed first, so "Default" really clears it and repeated recoloring never nests.
+        function notebookColorRanges(range) {
+            const hosts = Array.from(editor.querySelectorAll('[contenteditable="true"]')).filter(host => range.intersectsNode(host) && !host.querySelector('[contenteditable="true"]'));
+            return hosts.map(host => {
+                const part = document.createRange(); part.selectNodeContents(host);
+                if (host.contains(range.startContainer)) part.setStart(range.startContainer, range.startOffset);
+                if (host.contains(range.endContainer)) part.setEnd(range.endContainer, range.endOffset);
+                return part;
+            }).filter(part => !part.collapsed && (part.toString() !== '' || part.cloneContents().querySelector('img')));
+        }
+        function notebookApplyColor(range, property, value) {
+            const node = range.commonAncestorContainer;
+            const host = (node.nodeType === 1 ? node : node.parentElement)?.closest('[contenteditable="true"]');
+            if (!host) return;
+            // Select whole wrapper spans when the range merely sits at their edge.
+            const grow = atStart => {
+                let n = atStart ? range.startContainer : range.endContainer;
+                const edge = atStart ? range.startOffset === 0 : range.endOffset === (n.nodeType === 3 ? n.length : n.childNodes.length);
+                if (!edge || n === host || (n.nodeType === 1 && n.tagName !== 'SPAN')) return;
+                while (n.parentNode !== host && n.parentNode.tagName === 'SPAN' && (atStart ? n.parentNode.firstChild : n.parentNode.lastChild) === n) n = n.parentNode;
+                if (atStart) range.setStartBefore(n); else range.setEndAfter(n);
+            };
+            grow(true); grow(false);
+            const fragment = range.extractContents();
+            fragment.querySelectorAll('*').forEach(el => {
+                if (el.tagName === 'CODE') return;
+                el.style.removeProperty(property);
+                if (property === 'color') el.removeAttribute('color');
+                if (!el.getAttribute('style')) el.removeAttribute('style');
+                if ((el.tagName === 'SPAN' || el.tagName === 'FONT') && !el.attributes.length) el.replaceWith(...el.childNodes);
+            });
+            if (value) {
+                const wrapper = document.createElement('span'); wrapper.style.setProperty(property, value);
+                wrapper.appendChild(fragment); range.insertNode(wrapper);
+                range.setStartBefore(wrapper); range.setEndAfter(wrapper);
+            } else range.insertNode(fragment);
+            host.querySelectorAll('span[style]:empty').forEach(el => el.remove());
+        }
         function openNotebookColors(anchorElement, wholeBlock) {
             const anchor = anchorElement.getBoundingClientRect();
             const selection = window.getSelection();
@@ -3463,16 +3761,19 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                         if (wholeBlock && !editor.contains(notebookActionBlock)) return;
                         if (!wholeBlock && (!notebookRange || !editor.contains(notebookRange.commonAncestorContainer))) return;
                         pushUndoSnapshot();
-                        const ranges = [];
+                        const property = column === 2 ? 'color' : 'background-color', value = color[0] === 'default_color' ? '' : color[column];
+                        let ranges = [];
                         if (wholeBlock) {
                             const editables = notebookActionBlock.contentEditable === 'true' ? [notebookActionBlock] : Array.from(notebookActionBlock.querySelectorAll('[contenteditable="true"]'));
                             editables.forEach(el => { const range = document.createRange(); range.selectNodeContents(el); ranges.push(range); });
-                        } else ranges.push(notebookRange);
-                        ranges.forEach(range => {
-                            selection.removeAllRanges(); selection.addRange(range);
-                            document.execCommand('styleWithCSS', false, true);
-                            document.execCommand(command, false, color[column]);
-                        });
+                        } else ranges = notebookColorRanges(notebookRange);
+                        ranges.forEach(range => notebookApplyColor(range, property, value));
+                        if (!wholeBlock && ranges.length) {
+                            // Keep the words selected so another color can be applied right away.
+                            const joined = document.createRange();
+                            joined.setStart(ranges[0].startContainer, ranges[0].startOffset); joined.setEnd(ranges[ranges.length - 1].endContainer, ranges[ranges.length - 1].endOffset);
+                            selection.removeAllRanges(); selection.addRange(joined);
+                        }
                         notebookClosePopup(); triggerSave();
                     });
                     button.title = i18nGet(color[0], color[1]); button.setAttribute('aria-label', label.textContent + ': ' + button.title);

@@ -198,6 +198,33 @@ body.empty #start-center{display:flex}
 .context-info-popover.open{display:block}
 .context-info-popover b{color:var(--text);font-weight:600}
 
+/* ── Notebook notes picker ── */
+#notes-modal{display:none;position:fixed;inset:0;background:var(--overlay);
+  z-index:500;align-items:center;justify-content:center}
+#notes-modal.open{display:flex}
+#notes-modal-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;
+  width:340px;max-width:calc(100vw - 24px);max-height:82vh;display:flex;flex-direction:column;
+  padding:18px;box-shadow:0 8px 40px rgba(0,0,0,.22)}
+#notes-modal-card .cm-header{margin-bottom:8px}
+.notes-hint{font-size:10.5px;line-height:1.5;color:var(--text-muted);margin-bottom:10px}
+#notes-search{width:100%;box-sizing:border-box;font:inherit;font-size:12px;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 9px;outline:none;margin-bottom:8px}
+#notes-search:focus{border-color:var(--accent)}
+#notes-list{flex:1;min-height:80px;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.notes-row{display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:6px;
+  font-size:12px;cursor:pointer;user-select:none}
+.notes-row:hover{background:var(--surface)}
+.notes-row input{margin:0;accent-color:var(--accent);flex-shrink:0}
+.notes-row .notes-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notes-row.folder{font-weight:600;font-size:11px;color:var(--text-muted);margin-top:6px}
+.notes-empty{font-size:12px;color:var(--text-muted);padding:14px 4px;text-align:center}
+.notes-footer{display:flex;align-items:center;gap:8px;margin-top:12px}
+.notes-footer .notes-count{flex:1;font-size:11px;color:var(--text-muted)}
+.notes-btn{font:inherit;font-size:11px;font-weight:500;padding:5px 12px;border-radius:8px;
+  border:1px solid var(--border);background:none;color:var(--text-muted);cursor:pointer}
+.notes-btn:hover{color:var(--text);background:var(--surface)}
+.notes-btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+
 /* ── Chip manager modal ── */
 #chip-modal{display:none;position:fixed;inset:0;background:var(--overlay);
   z-index:500;align-items:center;justify-content:center}
@@ -584,6 +611,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
     </button>
   </div>
   <div class="card-context-row" data-card-context-row>
+    <button class="card-context-toggle" data-notes-button type="button" onclick="openNotesPicker()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>
+      <span data-notes-label>Select notes</span><span class="context-status-dot"></span>
+    </button>
     <button class="card-context-toggle" data-card-context-toggle type="button" aria-pressed="false" onclick="toggleCardContext()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
       <span data-card-context-label>Use current card</span><span class="context-status-dot"></span>
@@ -618,7 +649,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
   <div class="input-meta-row">
     <div id="disclaimer">AI can make mistakes &middot; Verify important information</div>
     <div class="card-context-row" data-card-context-row>
-      <button class="card-context-toggle" data-card-context-toggle type="button" aria-pressed="false" onclick="toggleCardContext()">
+      <button class="card-context-toggle" data-notes-button type="button" onclick="openNotesPicker()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>
+      <span data-notes-label>Select notes</span><span class="context-status-dot"></span>
+    </button>
+    <button class="card-context-toggle" data-card-context-toggle type="button" aria-pressed="false" onclick="toggleCardContext()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
         <span data-card-context-label>Use current card</span><span class="context-status-dot"></span>
       </button>
@@ -641,6 +676,24 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
     <div id="kh-steps"></div>
     <div class="kh-note" id="kh-note"></div>
     <button class="kh-open-btn" id="kh-open-btn"></button>
+  </div>
+</div>
+
+<!-- ── Notebook notes picker ── -->
+<div id="notes-modal">
+  <div id="notes-modal-card" role="dialog" aria-modal="true" aria-labelledby="notes-title">
+    <div class="cm-header">
+      <span class="cm-title" id="notes-title">Select notes</span>
+      <button class="cm-close" onclick="closeNotesPicker()">Close</button>
+    </div>
+    <div class="notes-hint">Selected notebook pages are sent to your AI provider with your next questions. Your notebook is only read, never changed.</div>
+    <input id="notes-search" type="search" placeholder="Search notes…" autocomplete="off"/>
+    <div id="notes-list"></div>
+    <div class="notes-footer">
+      <span class="notes-count" id="notes-count"></span>
+      <button class="notes-btn" onclick="clearNotesSelection()">Clear</button>
+      <button class="notes-btn primary" onclick="applyNotesSelection()">Attach</button>
+    </div>
   </div>
 </div>
 
@@ -828,6 +881,7 @@ function init(cfg) {
   else { document.documentElement.classList.remove('dark'); document.body.classList.remove('dark'); }
   translateStaticUI(document.body);
   localizeHelpBodies();
+  updateNotesButtons();
   var llamaHint = document.getElementById('llama-endpoint-hint');
   if (llamaHint) llamaHint.textContent = tr('Base URL of your llama.cpp server (the OpenAI-compatible /v1 path is added automatically).');
   var promptInput = document.getElementById('cm-new-prompt');
@@ -1096,6 +1150,152 @@ function toggleCardContextInfo(button, event) {
     button.setAttribute('aria-expanded', 'true');
   }
 }
+
+// ── Notebook notes (read-only context) ────────────────────────────────────────
+var notesOutline = {folders: [], pages: []};
+var attachedNoteIds = [];
+var pendingNoteIds = {};
+var notesLoaded = false;
+
+function updateNotesButtons() {
+  var titles = {};
+  notesOutline.pages.forEach(function(p) { titles[p.id] = p.title || tr('Untitled'); });
+  var n = attachedNoteIds.length;
+  document.querySelectorAll('[data-notes-button]').forEach(function(btn) {
+    btn.classList.toggle('on', n > 0);
+    var label = btn.querySelector('[data-notes-label]');
+    if (label) label.textContent = tr('Select notes') + (n ? ' (' + n + ')' : '');
+    btn.title = n ? attachedNoteIds.map(function(id) { return titles[id] || id; }).join(', ') : tr('Select notes');
+  });
+}
+
+function openNotesPicker() {
+  pendingNoteIds = {};
+  attachedNoteIds.forEach(function(id) { pendingNoteIds[id] = true; });
+  document.getElementById('notes-search').value = '';
+  document.getElementById('notes-modal').classList.add('open');
+  renderNotesList();
+  sendToPython('list_notes', {});
+  document.getElementById('notes-search').focus();
+}
+
+function closeNotesPicker() {
+  document.getElementById('notes-modal').classList.remove('open');
+}
+
+function receiveNotes(outline) {
+  notesOutline = {folders: (outline && outline.folders) || [], pages: (outline && outline.pages) || []};
+  notesLoaded = true;
+  // Forget pages that no longer exist.
+  var exists = {};
+  notesOutline.pages.forEach(function(p) { exists[p.id] = true; });
+  attachedNoteIds = attachedNoteIds.filter(function(id) { return exists[id]; });
+  Object.keys(pendingNoteIds).forEach(function(id) { if (!exists[id]) delete pendingNoteIds[id]; });
+  if (document.getElementById('notes-modal').classList.contains('open')) renderNotesList();
+  updateNotesButtons();
+}
+
+function _notesCount() { return Object.keys(pendingNoteIds).length; }
+
+function _notesRow(page, depth) {
+  var row = document.createElement('label');
+  row.className = 'notes-row';
+  row.style.paddingLeft = (4 + depth * 14) + 'px';
+  var box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = !!pendingNoteIds[page.id];
+  box.addEventListener('change', function() {
+    if (box.checked) pendingNoteIds[page.id] = true; else delete pendingNoteIds[page.id];
+    _updateNotesCount();
+  });
+  var title = document.createElement('span');
+  title.className = 'notes-title';
+  title.textContent = (page.icon ? page.icon + ' ' : '') + (page.title || tr('Untitled'));
+  row.appendChild(box);
+  row.appendChild(title);
+  return row;
+}
+
+function _updateNotesCount() {
+  var n = _notesCount();
+  document.getElementById('notes-count').textContent = n ? n + ' ✓' : '';
+}
+
+function renderNotesList() {
+  var list = document.getElementById('notes-list');
+  list.innerHTML = '';
+  var pages = notesOutline.pages;
+  if (!pages.length) {
+    if (!notesLoaded) { _updateNotesCount(); return; }
+    var empty = document.createElement('div');
+    empty.className = 'notes-empty';
+    empty.textContent = tr('No notebook pages yet.');
+    list.appendChild(empty);
+    _updateNotesCount();
+    return;
+  }
+  var query = document.getElementById('notes-search').value.trim().toLowerCase();
+  if (query) {
+    pages.filter(function(p) { return (p.title || '').toLowerCase().indexOf(query) !== -1; })
+      .forEach(function(p) { list.appendChild(_notesRow(p, 0)); });
+    _updateNotesCount();
+    return;
+  }
+  var byId = {}, children = {};
+  pages.forEach(function(p) { byId[p.id] = p; });
+  pages.forEach(function(p) {
+    if (p.parentPageId && byId[p.parentPageId] && p.parentPageId !== p.id) {
+      (children[p.parentPageId] = children[p.parentPageId] || []).push(p);
+    }
+  });
+  var seen = {};
+  function addTree(page, depth) {
+    if (seen[page.id]) return;
+    seen[page.id] = true;
+    list.appendChild(_notesRow(page, depth));
+    (children[page.id] || []).forEach(function(child) { addTree(child, depth + 1); });
+  }
+  var isRoot = function(p) { return !(p.parentPageId && byId[p.parentPageId] && p.parentPageId !== p.id); };
+  var folderIds = {};
+  notesOutline.folders.forEach(function(f) { folderIds[f.id] = true; });
+  pages.filter(function(p) { return isRoot(p) && (!p.folderId || !folderIds[p.folderId]); })
+    .forEach(function(p) { addTree(p, 0); });
+  notesOutline.folders.forEach(function(folder) {
+    var roots = pages.filter(function(p) { return isRoot(p) && p.folderId === folder.id; });
+    if (!roots.length) return;
+    var head = document.createElement('div');
+    head.className = 'notes-row folder';
+    head.textContent = folder.name || '';
+    list.appendChild(head);
+    roots.forEach(function(p) { addTree(p, 1); });
+  });
+  // Pages in a cycle or with an unreachable parent still get listed.
+  pages.forEach(function(p) { addTree(p, 0); });
+  _updateNotesCount();
+}
+
+function clearNotesSelection() {
+  pendingNoteIds = {};
+  renderNotesList();
+}
+
+function applyNotesSelection() {
+  var order = notesOutline.pages.map(function(p) { return p.id; });
+  attachedNoteIds = order.filter(function(id) { return pendingNoteIds[id]; });
+  updateNotesButtons();
+  closeNotesPicker();
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('notes-modal').classList.contains('open')) {
+    e.preventDefault();
+    closeNotesPicker();
+  }
+});
+document.getElementById('notes-search').addEventListener('input', renderNotesList);
+document.getElementById('notes-modal').addEventListener('mousedown', function(e) {
+  if (e.target === this) closeNotesPicker();
+});
 
 // ── Chip manager ──────────────────────────────────────────────────────────────
 function openChipManager() {
@@ -1544,7 +1744,8 @@ function trySendFromEmpty() {
   setBusy(true);
   sendToPython('send_message', {
     text: text,
-    useCardContext: cardContextEnabled && cardContextAvailable
+    useCardContext: cardContextEnabled && cardContextAvailable,
+    noteIds: attachedNoteIds.slice()
   });
 }
 
@@ -1560,7 +1761,8 @@ function trySend() {
   setBusy(true);
   sendToPython('send_message', {
     text: text,
-    useCardContext: cardContextEnabled && cardContextAvailable
+    useCardContext: cardContextEnabled && cardContextAvailable,
+    noteIds: attachedNoteIds.slice()
   });
 }
 

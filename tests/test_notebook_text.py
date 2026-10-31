@@ -61,6 +61,15 @@ class NotebookTextTests(unittest.TestCase):
         omitted = nt.pages_to_context(body, ['a', 'b', 'c'], total=120)
         self.assertIn('omitted', omitted)
 
+    def test_notebook_outline_has_sections_and_pages(self):
+        body = json.dumps({'folders': [{'id': 'f1', 'name': 'Anatomie', 'open': True}, 'junk'],
+                           'pages': [{'id': 'a', 'title': 'A', 'folderId': 'f1', 'blocks': []}]})
+        outline = nt.notebook_outline(body)
+        self.assertEqual(outline['folders'], [{'id': 'f1', 'name': 'Anatomie'}])
+        self.assertEqual(outline['pages'][0]['folderId'], 'f1')
+        self.assertEqual(nt.notebook_outline('[]')['pages'][0]['id'], 'legacy')
+        self.assertEqual(nt.notebook_outline('nope'), {'folders': [], 'pages': []})
+
     def test_legacy_and_invalid_data(self):
         legacy = json.dumps([{'type': 'text', 'html': 'old'}])
         self.assertEqual(nt.pages_to_context(legacy, ['legacy']), '<notebook_page title="My Notes">\nold\n</notebook_page>')

@@ -189,6 +189,8 @@ SURFACE_SOURCES: Dict[str, tuple[str, ...]] = {
         "Short", "Concise", "Detailed", "Quiz Me", "Mnemonic", "Key", "On", "Off",
         "No custom buttons yet.", "Delete", "Please enter a button name.",
         "Please enter a prompt.", "Add {content} to your prompt (where the card text goes).",
+        "Select notes", "Selected notebook pages are sent to your AI provider with your next questions. Your notebook is only read, never changed.",
+        "Search notes…", "Clear", "Attach", "No notebook pages yet.", "Untitled", "Close",
         "Current card context is on", "Use the current Anki card as context",
         "Waiting for a card — click to turn off", "Open a card in the reviewer first",
         "Press this key to trigger “{label}” when not typing", "Get a {provider} API Key",

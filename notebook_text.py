@@ -181,6 +181,21 @@ def page_outline(body: str) -> list[dict]:
     ]
 
 
+def notebook_outline(body: str) -> dict:
+    """Everything a page picker needs: sections ("folders") and the page list."""
+    try:
+        data = json.loads(body)
+    except (TypeError, ValueError):
+        data = None
+    folders = []
+    if isinstance(data, dict) and isinstance(data.get("folders"), list):
+        folders = [
+            {"id": str(f.get("id")), "name": str(f.get("name") or "")}
+            for f in data["folders"] if isinstance(f, dict) and f.get("id") is not None
+        ]
+    return {"folders": folders, "pages": page_outline(body)}
+
+
 def pages_to_context(body: str, page_ids: Iterable[str],
                      per_page: int = MAX_PAGE_CHARS, total: int = MAX_TOTAL_CHARS) -> str:
     """Text for the selected pages (in the given order), clipped per page and in total."""

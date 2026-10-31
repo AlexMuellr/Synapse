@@ -190,5 +190,28 @@ const doc=blocks=>({pages:[{id:'A',title:'T',icon:'',blocks}],activePageId:'A'})
   await page.evaluate(()=>document.body.classList.remove('nightMode'));
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS word colors: partial/multi-block selection, reset, combinations, undo/redo, persistence, dark mode');
+
+  // ---- Slash menu fixes ----
+  const menuOpen=()=>page.evaluate(()=>document.getElementById('slash-menu').style.display==='block');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('a/b');assert.equal(await menuOpen(),false,'a "/" inside a word does not open the menu');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('/');assert.equal(await menuOpen(),true,'"/" at the start opens the menu');
+  await page.keyboard.type('zzz');assert.equal(await menuOpen(),false,'menu closes when nothing matches');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('see /h');assert.equal(await menuOpen(),true,'"/" after a space opens the menu');
+  await page.keyboard.type('x ');assert.equal(await menuOpen(),false,'typing on past the command closes it');
+  for(const [command,type] of [['/h1','h1'],['/h2','h2'],['/h3','h3']]){
+   await load([{type:'text',html:''}]);await focusBlock(0);
+   await page.keyboard.type(command);await page.keyboard.press('Enter');
+   const [block]=await blocks();
+   assert.equal(block.type,type,command+' converts');
+   assert.equal(block.html.replace(/<br>|&nbsp;/g,'').trim(),'',command+' leaves no digit or text behind: '+block.html);
+  }
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('/h1');await page.keyboard.press('Enter');await page.keyboard.type('Title');
+  assert.equal((await blocks())[0].html,'Title','typing continues cleanly in the new heading');
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS slash menu: closes without match, only opens for commands, /h1-/h3 leave no digit');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

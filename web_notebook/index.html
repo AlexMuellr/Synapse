@@ -2008,7 +2008,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
 
         function stripCommandPrefix(html, numbered = false) {
             const holder = document.createElement('div'); holder.innerHTML = html;
-            const match = holder.textContent.match(numbered ? /^(?:1\. )/ : /^(?:### |## |# |- |\[\] |> |\/[a-z]+ ?)/i);
+            const match = holder.textContent.match(numbered ? /^(?:1\. )/ : /^(?:### |## |# |- |\[\] |> |\/[a-z0-9]+ ?)/i);
             if (!match) return html;
             let remaining = match[0].length;
             const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
@@ -2326,7 +2326,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             else if (text.startsWith('[] ') || text === '/todo' || text === '/todo ') replaceWithType(el, 'todo');
             else if (text.startsWith('> ') || text === '/quote' || text === '/quote ') replaceWithType(el, 'quote');
             
-            if (text.includes('/')) {
+            // The menu belongs to a command typed at the start of the text or after a space ("km/h" or "and/or" is not one).
+            const slashAt = text.lastIndexOf('/');
+            const isCommand = slashAt >= 0 && (slashAt === 0 || /\s/.test(text[slashAt - 1])) && !/\s/.test(text.slice(slashAt + 1));
+            if (isCommand) {
                 const sel = window.getSelection();
                 if(sel.rangeCount > 0) {
                     const rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -2339,6 +2342,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                         const aliases = (item.dataset.alias || '').split(' ');
                         item.style.display = txt.includes(cmd) || aliases.some(alias => alias && alias.startsWith(cmd)) ? 'flex' : 'none';
                     });
+                    // A "/" that matches no command (a path, "and/or", a finished sentence) must not keep the menu open.
+                    if (!Array.from(menu.children).some(item => !item.classList.contains('menu-footer') && item.style.display !== 'none')) menu.style.display = 'none';
                 }
             } else { menu.style.display = 'none'; }
             triggerSave();

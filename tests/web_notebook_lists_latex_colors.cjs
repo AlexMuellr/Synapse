@@ -213,5 +213,30 @@ const doc=blocks=>({pages:[{id:'A',title:'T',icon:'',blocks}],activePageId:'A'})
   assert.equal((await blocks())[0].html,'Title','typing continues cleanly in the new heading');
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS slash menu: closes without match, only opens for commands, /h1-/h3 leave no digit');
+
+  // ---- Auto-closing parentheses ----
+  const caretIn=()=>page.evaluate(()=>{const s=getSelection(),n=s.anchorNode;return n?[n.textContent.slice(0,s.anchorOffset),n.textContent.slice(s.anchorOffset)]:null;});
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('(');
+  assert.deepEqual(await caretIn(),['(',')'],'"(" writes "()" with the caret inside');
+  await page.keyboard.type('abc');assert.equal((await blocks())[0].html,'(abc)');
+  await page.keyboard.type(')');assert.equal((await blocks())[0].html,'(abc)','typing ")" steps over the existing one');
+  await page.keyboard.type(' x');assert.equal((await blocks())[0].html.replace('&nbsp;',' '),'(abc) x','typing continues after the pair');
+  await page.keyboard.type('(()');assert.equal((await blocks())[0].html.replace('&nbsp;',' '),'(abc) x(())','nested pairs stay balanced');
+  await load([{type:'text',html:'select me'}]);await focusBlock(0);
+  await page.evaluate(()=>{const n=editor.children[0].firstChild,r=document.createRange();r.setStart(n,0);r.setEnd(n,6);const s=getSelection();s.removeAllRanges();s.addRange(r);});
+  await page.keyboard.type('(');assert.equal((await blocks())[0].html.startsWith('()'),false,'a selection is replaced by "(", not wrapped in a pair');
+  await load([{type:'toggle',html:'',body:'',open:true},{type:'todo',html:'',checked:false},{type:'code',html:''}]);
+  for(const [i,sel] of [[0,'.toggle-title'],[1,'.todo-content'],[2,null]]){
+   await page.evaluate(([i,sel])=>{const el=editor.children[i],f=sel?el.querySelector(sel):el;f.focus();const r=document.createRange();r.selectNodeContents(f);r.collapse(true);const s=getSelection();s.removeAllRanges();s.addRange(r);},[i,sel]);
+   await page.keyboard.type('(x');
+   const html=(await blocks())[i].html;
+   assert.equal(html,'(x)','pairs work in '+(sel||'code blocks'));
+  }
+  await load([{type:'latex',html:'',latex:''}]);
+  await page.evaluate(()=>notebookLatexEdit(editor.children[0]));
+  await page.keyboard.type('(');assert.equal((await blocks())[0].latex,'(','the LaTeX source field is left alone');
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS auto-closing parentheses: pair, step over, nesting, selection, other fields');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

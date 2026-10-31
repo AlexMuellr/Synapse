@@ -93,6 +93,19 @@ def _pdf_source_html(filename: str, pages: list[int], pdf_id: str) -> str:
         f"{html.escape(source)}{links}</div>"
     )
 
+def _notebook_source_html(title: str) -> str:
+    """Small source label for cards made from a notebook page (plain text, escaped)."""
+    label = f"{_('Source')}: {_('Notebook')}"
+    if title:
+        label += f" — {title}"
+    return (
+        '<div style="margin-top:10px;color:#888;font-size:0.72em;'
+        'line-height:1.35;border-top:1px solid rgba(128,128,128,.2);'
+        'padding-top:5px">'
+        f"{html.escape(label)}</div>"
+    )
+
+
 # ──────────────────────────────────────────────
 # HTML i18n injection
 # ──────────────────────────────────────────────
@@ -217,6 +230,58 @@ def _build_i18n_script(tool_name: str) -> str:
             "block_table":        _("Table"),
             "block_pagelink":     _("Link to page"),
             "paste_tip":          _("Tip: Paste images (Ctrl+V) supported"),
+            "card_creator": _("Card Creator"),
+            "creator_type": _('Card type'),
+            "creator_basic": _('Basic (Front / Back)'),
+            "creator_reversed": _('Basic + Reversed'),
+            "creator_cloze": _('Cloze'),
+            "creator_new_cloze": _('New cloze'),
+            "creator_same_cloze": _('Same card'),
+            "creator_cloze_hint": _('Select text below, then add a cloze. Different numbers create separate cards; matching numbers hide together.'),
+            "creator_text": _('Text'),
+            "creator_extra": _('Extra'),
+            "creator_select_cloze": _('Select the text you want to hide first.'),
+            "creator_plain_cloze": _('Select plain text outside an existing cloze.'),
+            "creator_cloze_required": _('Add at least one cloze deletion, for example {{c1::answer}}.'),
+            "creator_reverse_required": _('Reversed cards need text on both sides.'),
+            "draft_front": _("Front"),
+            "draft_back": _("Back side"),
+            "front_placeholder": _("Question or prompt"),
+            "back_placeholder": _("Answer or explanation"),
+            "add_card": _("Add card"),
+            "update_card": _("Update card"),
+            "new_card": _("New card"),
+            "source_short": _("Source"),
+            "cards_ready": _("{count} cards ready"),
+            "cards_label": _("Cards"),
+            "deck_name": _("Deck name"),
+            "deck_placeholder": _("Choose an existing deck or enter a new name"),
+            "current_deck": _("Current deck"),
+            "all_decks": _("Decks"),
+            "no_matching_decks": _("No matching decks. Enter a name to create one."),
+            "finish_session": _("Create cards"),
+            "finish_cards": _("Finish · Create {count} cards"),
+            "creating_cards": _("Creating cards…"),
+            "front_required": _("Enter a front side first."),
+            "deck_required": _("Choose or enter a deck name."),
+            "card_too_long": _("This card contains too much text."),
+            "duplicate_card": _("This card is already in the session."),
+            "too_many_cards": _("This session already contains 500 cards."),
+            "discard_draft": _("Discard the unfinished card draft?"),
+            "discard_session_confirm": _("Discard this unfinished Card Creator session?"),
+            "edit": _("Edit"),
+            "remove_card": _("Remove card"),
+            "discard_session": _("Discard session"),
+            "front_saved": _("Front saved"),
+            "back_saved": _("Back saved"),
+            "card_front": _("Card front"),
+            "card_back": _("Card back"),
+            "creator_empty": _("No cards collected yet."),
+            "nbc_subtitle": _("Build multiple cards from your notes"),
+            "nbc_include_source": _("Add the notebook page as source"),
+            "nbc_source_hint": _("Adds the page title in small text on the back."),
+            "nbc_empty_sub": _("Enter text manually or select text in your notes."),
+            "nbc_select_text_first": _("Select some text in your notes first."),
             "security_notice": _("For your safety, potentially unsafe HTML was kept as text or removed. It could otherwise run code. Normal text and safe links still work."),
             "dismiss": _("Dismiss"),
             "saved":              _("Saved"),
@@ -1981,7 +2046,13 @@ class NotebookPanel(QWidget):
             html = html.replace(_KATEX_PLACEHOLDER, _katex_inline_tags(), 1)
             preload_data = load_latest_note(self._database_path)
             preload_js   = _json_for_script(preload_data)
-            preload_tag  = f'<script id="synapse-preload">window.__SYNAPSE_PRELOAD__={preload_js};</script>'
+            deck_names_js = _json_for_script(_pdf_deck_names(), ensure_ascii=False)
+            current_deck_js = _json_for_script(_pdf_current_deck_name(), ensure_ascii=False)
+            preload_tag  = (
+                f'<script id="synapse-preload">window.__SYNAPSE_PRELOAD__={preload_js};'
+                f'window.__SYNAPSE_DECKS__={deck_names_js};'
+                f'window.__SYNAPSE_CURRENT_DECK__={current_deck_js};</script>'
+            )
             # Use a lambda replacement so that JSON backslash-escapes (e.g. \u, \n)
             # inside preload_tag are never interpreted as regex replacement tokens.
             html = re.sub(r'</head>', lambda m: preload_tag + m.group(0), html,
@@ -2260,6 +2331,8 @@ class NotebookPanel(QWidget):
         elif payload.startswith("pdf:create-batch:"):
             body = payload[len("pdf:create-batch:"):]
             self._create_pdf_card_batch(body)
+        elif payload.startswith("notes:create-batch:"):
+            self._create_pdf_card_batch(payload[len("notes:create-batch:"):], notebook=True)
         elif payload == "pdf:back":
             self._current_pdf_path = ""
             self._load_tool("pdf")
@@ -2534,9 +2607,13 @@ class NotebookPanel(QWidget):
             callback, True, _("Card draft opened in Anki")
         )
 
-    def _create_pdf_card_batch(self, body: str) -> None:
-        """Validate and create one undoable deck/card batch from the PDF UI."""
-        callback = "onPdfCardBatchCreated"
+    def _create_pdf_card_batch(self, body: str, notebook: bool = False) -> None:
+        """Validate and create one undoable deck/card batch from the PDF or notebook UI."""
+        callback = "onNotebookCardBatchCreated" if notebook else "onPdfCardBatchCreated"
+        too_many = (_("A Card Creator session can contain at most {count} cards.") if notebook
+                    else _("A PDF Card Creator session can contain at most {count} cards."))
+        too_long = _("One of the cards is too long.") if notebook else _("One of the PDF cards is too long.")
+        failed = _("Could not create the cards.") if notebook else _("Could not create the PDF cards.")
         try:
             data = self._decode_pdf_action_payload(body)
             deck_name = data.get("deckName", "")
@@ -2563,9 +2640,7 @@ class NotebookPanel(QWidget):
                 self._notify_pdf_action(
                     callback,
                     False,
-                    _("A PDF Card Creator session can contain at most {count} cards.").format(
-                        count=MAX_PDF_BATCH_CARDS
-                    ),
+                    too_many.format(count=MAX_PDF_BATCH_CARDS),
                 )
                 return
 
@@ -2594,7 +2669,7 @@ class NotebookPanel(QWidget):
                     return
                 if len(front) + len(back) > MAX_PDF_CARD_CHARS:
                     self._notify_pdf_action(
-                        callback, False, _("One of the PDF cards is too long.")
+                        callback, False, too_long
                     )
                     return
                 total_chars += len(front) + len(back)
@@ -2617,11 +2692,13 @@ class NotebookPanel(QWidget):
                         "back": back,
                         "pages": pages,
                         "include_source": raw_card.get("includeSource") is True,
+                        "source": (raw_card.get("source").strip()[:250]
+                                   if isinstance(raw_card.get("source"), str) else ""),
                     }
                 )
 
             if sum(card_count(card) for card in cards) > MAX_PDF_BATCH_CARDS:
-                self._notify_pdf_action(callback, False, _("A PDF Card Creator session can contain at most {count} cards.").format(count=MAX_PDF_BATCH_CARDS))
+                self._notify_pdf_action(callback, False, too_many.format(count=MAX_PDF_BATCH_CARDS))
                 return
             if total_chars > MAX_PDF_BATCH_CHARS:
                 self._notify_pdf_action(
@@ -2631,15 +2708,20 @@ class NotebookPanel(QWidget):
                 )
                 return
 
-            source_filename = os.path.basename(self._current_pdf_path) or _("PDF")
-            undo_label = _("Create PDF cards")
+            if notebook:
+                source_title = data.get("source", "")
+                source_filename = source_title.strip()[:250] if isinstance(source_title, str) else ""
+                undo_label = _("Create cards")
+            else:
+                source_filename = os.path.basename(self._current_pdf_path) or _("PDF")
+                undo_label = _("Create PDF cards")
             success_message = _("Created {count} cards in “{deck}”.").format(
                 count=sum(card_count(c) for c in cards), deck=deck_name
             )
         except Exception as exc:
             print(f"Notebook PDF card batch validation failed: {exc}")
             self._notify_pdf_action(
-                callback, False, _("Could not create the PDF cards.")
+                callback, False, failed
             )
             return
 
@@ -2654,7 +2736,8 @@ class NotebookPanel(QWidget):
                     note.fields[0] = NotebookPanel._pdf_text_to_html(card['front'])
                     back_html = NotebookPanel._pdf_text_to_html(card['back'])
                     if card['include_source']:
-                        back_html += _pdf_source_html(source_filename, card['pages'], pdf_id)
+                        back_html += (_notebook_source_html(card['source'] or source_filename) if notebook
+                                      else _pdf_source_html(source_filename, card['pages'], pdf_id))
                     note.fields[1] = back_html
                     notes.append(note)
                 deck_result = col.decks.add_normal_deck_with_name(deck_name)
@@ -2687,7 +2770,7 @@ class NotebookPanel(QWidget):
         def on_failure(exc: Exception) -> None:
             print(f"Notebook PDF card batch failed: {exc}")
             self._notify_pdf_action(
-                callback, False, _("Could not create the PDF cards.")
+                callback, False, failed
             )
 
         CollectionOp(parent=mw, op=create_batch).success(on_success).failure(

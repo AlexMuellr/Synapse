@@ -666,7 +666,77 @@
             content: attr(data-placeholder); color: var(--text-gray); opacity: 0.3;
             pointer-events: none;
         }
-    </style>
+            /* ── Card Creator (notes) ── */
+        #nb-creator-launch { position: relative; margin-left: 4px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; width: auto; padding: 0 10px; font-size: 12px; color: var(--synapse-primary, #0071D3); font-weight: 650; background: transparent; }
+        #nb-creator-launch:hover { background: var(--hover-bg); }
+        #nb-creator-launch svg { width: 16px; height: 16px; flex-shrink: 0; }
+        #nbc-count-badge { display: none; min-width: 17px; height: 17px; padding: 0 5px; align-items: center; justify-content: center; border-radius: 9px; background: var(--synapse-primary, #0071D3); color: #fff; font-size: 10px; line-height: 17px; }
+        #nbc-count-badge.show { display: inline-flex; }
+        @media (max-width: 860px) { #nb-creator-launch .nbc-launch-text { display: none; } }
+        #nb-card-creator { display: none; flex-direction: column; flex: 0 0 clamp(300px, 34vw, 380px); width: clamp(300px, 34vw, 380px); min-width: 0; background: var(--bg); border-left: 1px solid var(--border); position: relative; z-index: 11; cursor: default; overflow: hidden; }
+        #nb-card-creator.open { display: flex; }
+        #nb-card-creator { --nbc-accent: var(--synapse-primary, #0071D3); --nbc-danger: #e03e3e; --nbc-card: var(--sidebar-bg, var(--bg)); }
+        body.nightMode #nb-card-creator { --nbc-danger: #e05a5a; }
+        #nb-card-creator .creator-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        #nb-card-creator .creator-title-wrap { flex: 1; min-width: 0; }
+        #nb-card-creator .creator-title { font-size: 14px; font-weight: 700; }
+        #nb-card-creator .creator-subtitle { margin-top: 2px; color: var(--text-gray); font-size: 10.5px; }
+        #nb-card-creator .creator-close { width: 28px; height: 28px; border: none; border-radius: 6px; background: transparent; color: var(--text-gray); font-size: 18px; line-height: 1; cursor: pointer; }
+        #nb-card-creator .creator-close:hover { background: var(--hover-bg); color: var(--text); }
+        #nb-card-creator .creator-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 18px; }
+        #nb-card-creator .creator-field { margin-bottom: 10px; }
+        #nb-card-creator .creator-label { display: block; font-size: 11px; font-weight: 650; color: var(--text); margin-bottom: 5px; }
+        #nb-card-creator .creator-textarea, #nbc-deck-name { display: block; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 12px; line-height: 1.45; }
+        #nb-card-creator .creator-textarea { min-height: 70px; max-height: 180px; resize: vertical; padding: 8px 9px; }
+        #nbc-type { min-height: 34px !important; height: 34px; padding: 6px 10px !important; resize: none !important; }
+        #nbc-deck-name { height: 34px; padding: 6px 9px; }
+        #nb-card-creator .creator-textarea:focus, #nbc-deck-name:focus { outline: none; border-color: var(--nbc-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--nbc-accent) 14%, transparent); }
+        #nb-card-creator .creator-textarea::placeholder, #nbc-deck-name::placeholder { color: var(--text-gray); }
+        #nb-card-creator .creator-source-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--header-bg); cursor: pointer; margin-bottom: 10px; }
+        #nb-card-creator .creator-source-row input { margin-top: 2px; accent-color: var(--nbc-accent); }
+        #nb-card-creator .creator-source-title { font-size: 11px; font-weight: 600; }
+        #nb-card-creator .creator-source-hint { margin-top: 2px; color: var(--text-gray); font-size: 9.5px; line-height: 1.35; }
+        #nb-card-creator .creator-deck-picker { position: relative; }
+        #nbc-deck-menu { display: none; position: absolute; z-index: 30; left: 0; right: 0; bottom: calc(100% + 5px); max-height: 245px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+        #nbc-deck-menu.open { display: block; }
+        #nb-card-creator .deck-menu-section { padding: 5px 7px 3px; color: var(--text-gray); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+        #nb-card-creator .deck-menu-option { display: block; width: 100%; padding: 7px 8px; border: none; border-radius: 6px; background: transparent; color: var(--text); text-align: left; font: 500 11px/1.25 inherit; cursor: pointer; }
+        #nb-card-creator .deck-menu-option:hover, #nb-card-creator .deck-menu-option.active { background: var(--hover-bg); }
+        #nb-card-creator .deck-menu-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #nb-card-creator .deck-menu-path { display: block; margin-top: 2px; color: var(--text-gray); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #nb-card-creator .deck-menu-empty { padding: 10px 8px; color: var(--text-gray); font-size: 10px; }
+        #nb-card-creator .creator-form-actions { display: flex; gap: 7px; }
+        #nb-card-creator .creator-btn { min-height: 31px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+        #nb-card-creator .creator-btn:hover { background: var(--hover-bg); }
+        #nb-card-creator .creator-btn.primary { background: var(--nbc-accent); border-color: var(--nbc-accent); color: #fff; }
+        #nb-card-creator .creator-btn.primary:hover { opacity: .86; }
+        #nb-card-creator .creator-btn.danger { color: var(--nbc-danger); }
+        #nb-card-creator .creator-btn:disabled { opacity: .42; cursor: default; }
+        #nbc-add-card { flex: 1; }
+        #nbc-new-card { display: none; }
+        #nbc-new-card.show { display: block; }
+        #nb-card-creator .creator-divider { height: 1px; background: var(--border); margin: 14px 0 11px; }
+        #nb-card-creator .creator-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+        #nb-card-creator .creator-list-head .creator-label { margin: 0; }
+        #nbc-ready-label { color: var(--text-gray); font-size: 10.5px; font-weight: 600; }
+        #nbc-empty { padding: 15px 10px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; color: var(--text-gray); font-size: 10.5px; line-height: 1.45; }
+        #nb-card-creator .creator-card-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--nbc-card); }
+        #nb-card-creator .creator-card-number { width: 20px; height: 20px; flex: 0 0 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--nbc-accent) 12%, transparent); color: var(--nbc-accent); font-size: 10px; font-weight: 700; }
+        #nb-card-creator .creator-card-copy { flex: 1; min-width: 0; }
+        #nb-card-creator .creator-card-front, #nb-card-creator .creator-card-back { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10.5px; }
+        #nb-card-creator .creator-card-front { color: var(--text); font-weight: 600; }
+        #nb-card-creator .creator-card-back { color: var(--text-gray); margin-top: 3px; }
+        #nb-card-creator .creator-card-meta { color: var(--text-gray); font-size: 9px; margin-top: 4px; }
+        #nb-card-creator .creator-item-btn { border: none; background: transparent; color: var(--text-gray); cursor: pointer; padding: 3px; border-radius: 4px; font-size: 11px; }
+        #nb-card-creator .creator-item-btn:hover { background: var(--hover-bg); color: var(--text); }
+        #nb-card-creator .creator-item-btn.delete:hover { color: var(--nbc-danger); }
+        #nb-card-creator .creator-footer { flex-shrink: 0; padding: 10px 14px 12px; border-top: 1px solid var(--border); background: var(--nbc-card); }
+        #nb-card-creator .creator-footer-row { display: flex; gap: 7px; margin-top: 8px; }
+        #nbc-finish { flex: 1; }
+        #nbc-status { min-height: 15px; margin-top: 7px; font-size: 10.5px; color: var(--text-gray); }
+        #nbc-status.error { color: var(--nbc-danger); }
+        @media (max-width: 700px) { #nb-card-creator.open { position: fixed; top: 42px; right: 0; bottom: 0; width: min(380px, 100vw); box-shadow: -6px 0 24px rgba(0,0,0,.18); } }
+</style>
 <style id="synapse-keyboard-focus">
 body button:focus-visible, body input:focus-visible, body select:focus-visible,
 body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-visible {
@@ -840,6 +910,9 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         <button class="fmt-btn" onmousedown="event.preventDefault(); openNotebookColors(this, false)" title="Color" data-i18n-title="color">A ▾</button>
         <button class="fmt-btn" onmousedown="event.preventDefault(); notebookInline('strikeThrough')" title="Strikethrough" data-i18n-title="strikethrough"><s>S</s></button>
         <button class="fmt-btn" onmousedown="event.preventDefault(); notebookInline('code')" title="Inline code" data-i18n-title="inline_code">&lt;/&gt;</button>
+        <div style="width:1px;height:16px;background:rgba(128,128,128,0.35);margin:0 2px"></div>
+        <button class="fmt-btn" onmousedown="event.preventDefault(); nbcUseSelection('front')" title="Card front" data-i18n-title="card_front" data-i18n="card_front">Card front</button>
+        <button class="fmt-btn" onmousedown="event.preventDefault(); nbcUseSelection('back')" title="Card back" data-i18n-title="card_back" data-i18n="card_back">Card back</button>
     </div>
 
     <div id="app">
@@ -865,6 +938,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 <button id="recoverBtn" class="recover-btn" onclick="recoverAllCovers()" title="Cover all revealed terms again" data-i18n-title="recover_covers_title">
                     <svg width="15" height="13" viewBox="0 0 24 24" style="flex-shrink:0"><rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor"/></svg>
                     <span data-i18n="cover_title">Cover for learning</span>
+                </button>
+                <button id="nb-creator-launch" class="toggle-btn" type="button" onclick="toggleNbCreator()" title="Card Creator" data-i18n-title="card_creator" aria-label="Card Creator" data-i18n-aria-label="card_creator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v11"/></svg>
+                    <span class="nbc-launch-text" data-i18n="card_creator">Card Creator</span><span id="nbc-count-badge"></span>
                 </button>
                 <button id="notebook-outline-toggle" class="toggle-btn nb-header-control" onclick="toggleNotebookOutline()" title="Contents" data-i18n-title="contents" aria-label="Contents" data-i18n-aria-label="contents" aria-expanded="false" data-notebook-icon="contents"></button>
                 <button id="notebook-tools-toggle" class="toggle-btn nb-header-control" onclick="toggleNotebookTools()" title="Notebook actions" data-i18n-title="notebook_actions" aria-label="Notebook actions" data-i18n-aria-label="notebook_actions" data-notebook-icon="more"></button>
@@ -901,6 +978,62 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             <div class="sidebar-add-btn" onclick="addNewPage()"><span class="nb-ui-icon" data-notebook-icon="page"></span> <span data-i18n="new_page">New Page</span></div>
             <div class="sidebar-add-btn" style="margin-top:0; border-top:none; padding-top:4px;" onclick="addFolder()"><span class="nb-ui-icon" data-notebook-icon="folder"></span> <span data-i18n="new_folder">New Folder</span></div>
         </div>
+
+        <aside id="nb-card-creator" aria-label="Card Creator" data-i18n-aria-label="card_creator">
+            <div class="creator-header">
+                <div class="creator-title-wrap">
+                    <div class="creator-title" data-i18n="card_creator">Card Creator</div>
+                    <div class="creator-subtitle" data-i18n="nbc_subtitle">Build multiple cards from your notes</div>
+                </div>
+                <button class="creator-close" type="button" onclick="nbcClose()" title="Close" data-i18n-title="close" aria-label="Close">×</button>
+            </div>
+            <div class="creator-scroll">
+                <div class="creator-field"><label class="creator-label" for="nbc-type" data-i18n="creator_type">Card type</label>
+                    <select id="nbc-type" class="creator-textarea" onchange="nbcTypeChanged()">
+                        <option value="basic" data-i18n="creator_basic">Basic (Front / Back)</option><option value="reversed" data-i18n="creator_reversed">Basic + Reversed</option><option value="cloze" data-i18n="creator_cloze">Cloze</option>
+                    </select>
+                </div>
+                <div id="nbc-cloze-tools" hidden style="margin-bottom:12px">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="creator-btn" onclick="nbcInsertCloze(false)" data-i18n="creator_new_cloze">New cloze</button><button type="button" class="creator-btn" onclick="nbcInsertCloze(true)" data-i18n="creator_same_cloze">Same card</button></div>
+                    <p style="font-size:11px;line-height:1.5;opacity:.75;margin:6px 0 0" data-i18n="creator_cloze_hint">Select text below, then add a cloze. Different numbers create separate cards; matching numbers hide together.</p>
+                </div>
+                <div class="creator-field">
+                    <label class="creator-label" for="nbc-front" id="nbc-front-label" data-i18n="draft_front">Front</label>
+                    <textarea id="nbc-front" class="creator-textarea" maxlength="50000" data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></textarea>
+                </div>
+                <div class="creator-field">
+                    <label class="creator-label" for="nbc-back" id="nbc-back-label" data-i18n="draft_back">Back</label>
+                    <textarea id="nbc-back" class="creator-textarea" maxlength="50000" data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></textarea>
+                </div>
+                <label class="creator-source-row" for="nbc-include-source">
+                    <input id="nbc-include-source" type="checkbox">
+                    <span>
+                        <span class="creator-source-title" data-i18n="nbc_include_source">Add the notebook page as source</span>
+                        <span class="creator-source-hint" style="display:block" data-i18n="nbc_source_hint">Adds the page title in small text on the back.</span>
+                    </span>
+                </label>
+                <div class="creator-form-actions">
+                    <button type="button" class="creator-btn primary" id="nbc-add-card" onclick="nbcCommitCard()" data-i18n="add_card">Add card</button>
+                    <button type="button" class="creator-btn" id="nbc-new-card" onclick="nbcNewCard()" data-i18n="new_card">New card</button>
+                </div>
+                <div class="creator-divider"></div>
+                <div class="creator-list-head"><span class="creator-label" data-i18n="cards_label">Cards</span><span id="nbc-ready-label"></span></div>
+                <div id="nbc-card-list"></div>
+                <div id="nbc-empty"><strong data-i18n="creator_empty">No cards collected yet.</strong><br><span data-i18n="nbc_empty_sub">Enter text manually or select text in your notes.</span></div>
+            </div>
+            <div class="creator-footer">
+                <label class="creator-label" for="nbc-deck-name" data-i18n="deck_name">Deck name</label>
+                <div class="creator-deck-picker">
+                    <input id="nbc-deck-name" maxlength="250" data-i18n-placeholder="deck_placeholder" placeholder="Choose an existing deck or enter a new name" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="nbc-deck-menu">
+                    <div id="nbc-deck-menu" role="listbox"></div>
+                </div>
+                <div id="nbc-status" role="status"></div>
+                <div class="creator-footer-row">
+                    <button type="button" class="creator-btn danger" id="nbc-discard" onclick="nbcDiscard()" data-i18n="discard_session">Discard session</button>
+                    <button type="button" class="creator-btn primary" id="nbc-finish" onclick="nbcFinish()" data-i18n="finish_session">Create cards</button>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <div id="slash-menu">
@@ -980,7 +1113,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             updateNotebookNavigation();
         }
         function captureNotebookCheckpoint() {
-            return {pages:new Map(appState.pages.map(page=>[page.id,JSON.stringify(page)])),order:appState.pages.map(page=>page.id),root:new Map(Object.entries(appState).filter(([key])=>key!=='pages'&&key!=='sidebarOpen').map(([key,value])=>[key,JSON.stringify(value)]))};
+            return {pages:new Map(appState.pages.map(page=>[page.id,JSON.stringify(page)])),order:appState.pages.map(page=>page.id),root:new Map(Object.entries(appState).filter(([key])=>key!=='pages'&&key!=='sidebarOpen'&&key!=='cardCreatorSession').map(([key,value])=>[key,JSON.stringify(value)]))};
         }
         function updateNotebookNavigation() {
             document.getElementById('notebook-back').disabled = notebookActionIndex === 0;
@@ -1131,6 +1264,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 appState.activePageId = appState.pages[0]?.id || Date.now().toString(); 
             }
             loadPage(appState.activePageId, false);
+            if (window.nbcRefresh) window.nbcRefresh();
             // Always start with the page list collapsed. The sidebar is already
             // 'closed' in the markup, so removing the class here would animate
             // it open→closed on startup (the "flap" effect). Keep it closed and
@@ -2794,6 +2928,32 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         // 'input' bubbles from every nested contenteditable (blocks, toggles,
         // callouts, table cells), so one listener on the editor covers them all.
         editor.addEventListener('input', () => { if (autoReplaceArrows()) triggerSave(); });
+
+        // Typing "(" writes "()" with the caret in between; typing ")" right before an existing ")" just steps over it.
+        editor.addEventListener('keydown', e => {
+            if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key !== '(' && e.key !== ')') return;
+            if (!e.target.isContentEditable || e.target.closest('.latex-block')) return;
+            const sel = window.getSelection();
+            if (!sel.rangeCount || !editor.contains(sel.anchorNode)) return;
+            if (e.key === ')') {
+                const node = sel.anchorNode;
+                if (sel.isCollapsed && node.nodeType === Node.TEXT_NODE && node.textContent[sel.anchorOffset] === ')') {
+                    e.preventDefault();
+                    sel.collapse(node, sel.anchorOffset + 1);
+                }
+                return;
+            }
+            if (!sel.isCollapsed) return; // a selection is replaced by "(" as usual
+            e.preventDefault();
+            document.execCommand('insertText', false, '()');
+            const after = window.getSelection();
+            if (after.anchorNode && after.anchorNode.nodeType === Node.TEXT_NODE && after.anchorOffset > 0) {
+                after.collapse(after.anchorNode, after.anchorOffset - 1);
+            } else if (after.modify) {
+                after.modify('move', 'backward', 'character');
+            }
+        });
         titleEl.addEventListener('input', () => {
             if (autoReplaceArrows()) {
                 const p = appState.pages.find(p => p.id === appState.activePageId);
@@ -3947,6 +4107,336 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             else console.warn('[SynapsePro] Background task rejected:', e.reason);
             e.preventDefault();
         });
+    })();
+    </script>
+    <script>
+    // ── Card Creator for notes ────────────────────────────────────────────────
+    // The session (collected cards, draft, deck) lives in appState.cardCreatorSession so an
+    // unfinished session survives restarts. It is excluded from page undo/redo history.
+    (function () {
+        const panel = document.getElementById('nb-card-creator');
+        const $ = id => document.getElementById(id);
+        const MAX_CARDS = 500, MAX_TEXT = 50000, TYPES = ['basic', 'reversed', 'cloze'];
+        let pending = false, deckIndex = -1, statusTimer = null, saveTimer = null;
+        const tx = (key, fallback) => i18nGet(key, fallback);
+        const makeId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const clozeRe = /\{\{c([1-9][0-9]{0,2})::[^{}]+\}\}/g;
+
+        function currentPageTitle() {
+            const page = appState.pages.find(p => p.id === appState.activePageId);
+            return String((page && page.title) || '').trim().slice(0, 250);
+        }
+        function cleanCard(raw) {
+            raw = raw && typeof raw === 'object' ? raw : {};
+            return {
+                id: typeof raw.id === 'string' ? raw.id : makeId(),
+                type: TYPES.includes(raw.type) ? raw.type : 'basic',
+                front: typeof raw.front === 'string' ? raw.front.slice(0, MAX_TEXT) : '',
+                back: typeof raw.back === 'string' ? raw.back.slice(0, MAX_TEXT) : '',
+                includeSource: raw.includeSource === true,
+                source: typeof raw.source === 'string' ? raw.source.slice(0, 250) : ''
+            };
+        }
+        function cleanSession(raw) {
+            raw = raw && typeof raw === 'object' ? raw : {};
+            const draft = raw.draft && typeof raw.draft === 'object' ? raw.draft : {};
+            const cards = Array.isArray(raw.cards) ? raw.cards.slice(0, MAX_CARDS).map(cleanCard).filter(card => card.front.trim()) : [];
+            let editing = Number.isInteger(raw.editingIndex) ? raw.editingIndex : -1;
+            if (editing < 0 || editing >= cards.length) editing = -1;
+            return {
+                id: typeof raw.id === 'string' ? raw.id : makeId(),
+                deckName: typeof raw.deckName === 'string' ? raw.deckName.slice(0, 250) : '',
+                cards, editingIndex: editing,
+                draft: {
+                    type: TYPES.includes(draft.type) ? draft.type : 'basic',
+                    front: typeof draft.front === 'string' ? draft.front.slice(0, MAX_TEXT) : '',
+                    back: typeof draft.back === 'string' ? draft.back.slice(0, MAX_TEXT) : '',
+                    includeSource: draft.includeSource === true
+                }
+            };
+        }
+        // Stored data is untrusted (older/newer versions, hand edits, sync): clean it once per object.
+        const cleaned = new WeakSet();
+        function session() {
+            const stored = appState.cardCreatorSession;
+            if (!stored || typeof stored !== 'object' || !cleaned.has(stored)) {
+                appState.cardCreatorSession = cleanSession(stored);
+                cleaned.add(appState.cardCreatorSession);
+            }
+            return appState.cardCreatorSession;
+        }
+        function hasWork(s) { return !!(s && ((s.cards && s.cards.length) || (s.draft && (s.draft.front || s.draft.back)))); }
+        function persist() {
+            // Not a page edit: no history entry, just a debounced save of the whole state.
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => { saveDirty = true; saveRevision++; clearTimeout(saveTimeout); saveTimeout = setTimeout(persistNow, 400); }, 250);
+        }
+        function persistNowSoon() { clearTimeout(saveTimer); saveDirty = true; saveRevision++; clearTimeout(saveTimeout); saveTimeout = setTimeout(persistNow, 100); }
+        function status(message, isError) {
+            const el = $('nbc-status');
+            el.textContent = message || '';
+            el.className = isError ? 'error' : '';
+            clearTimeout(statusTimer);
+            if (message) statusTimer = setTimeout(() => { el.textContent = ''; el.className = ''; }, 5000);
+        }
+        function cardCount(card) {
+            if (card.type === 'reversed') return 2;
+            if (card.type === 'cloze') return new Set([...card.front.matchAll(clozeRe)].map(m => m[1])).size;
+            return 1;
+        }
+        function syncForm() {
+            if (!appState.cardCreatorSession) return;
+            const s = session();
+            s.draft.type = TYPES.includes($('nbc-type').value) ? $('nbc-type').value : 'basic';
+            s.draft.front = $('nbc-front').value.slice(0, MAX_TEXT);
+            s.draft.back = $('nbc-back').value.slice(0, MAX_TEXT);
+            s.draft.includeSource = $('nbc-include-source').checked;
+            s.deckName = $('nbc-deck-name').value.slice(0, 250);
+        }
+        function typeUi() {
+            const cloze = $('nbc-type').value === 'cloze';
+            $('nbc-cloze-tools').hidden = !cloze;
+            $('nbc-front-label').textContent = cloze ? tx('creator_text', 'Text') : tx('draft_front', 'Front');
+            $('nbc-back-label').textContent = cloze ? tx('creator_extra', 'Extra') : tx('draft_back', 'Back');
+        }
+        function finishLabel(s) {
+            const adds = s.editingIndex < 0 && s.draft.front.trim();
+            const count = s.cards.reduce((n, c) => n + cardCount(c), 0) + (adds ? cardCount(s.draft) : 0);
+            return tx('finish_cards', 'Finish · Create {count} cards').replace('{count}', count);
+        }
+        function updateBadge() {
+            const s = appState.cardCreatorSession ? session() : null, n = s ? s.cards.length : 0;
+            const badge = $('nbc-count-badge');
+            badge.textContent = String(n);
+            badge.classList.toggle('show', n > 0);
+        }
+        function render() {
+            const s = session(), d = s.draft;
+            $('nbc-type').value = d.type;
+            typeUi();
+            $('nbc-front').value = d.front;
+            $('nbc-back').value = d.back;
+            $('nbc-include-source').checked = d.includeSource;
+            $('nbc-deck-name').value = s.deckName;
+            const editing = s.editingIndex >= 0;
+            $('nbc-add-card').textContent = editing ? tx('update_card', 'Update card') : tx('add_card', 'Add card');
+            $('nbc-new-card').classList.toggle('show', editing || !!(d.front || d.back));
+            $('nbc-ready-label').textContent = tx('cards_ready', '{count} cards ready').replace('{count}', s.cards.reduce((n, c) => n + cardCount(c), 0));
+            const list = $('nbc-card-list');
+            list.replaceChildren();
+            s.cards.forEach((card, index) => {
+                const item = document.createElement('div'); item.className = 'creator-card-item';
+                const number = document.createElement('span'); number.className = 'creator-card-number'; number.textContent = String(index + 1);
+                const copy = document.createElement('div'); copy.className = 'creator-card-copy';
+                const front = document.createElement('div'); front.className = 'creator-card-front'; front.textContent = card.front;
+                const back = document.createElement('div'); back.className = 'creator-card-back'; back.textContent = card.back || '—';
+                copy.append(front, back);
+                const meta = [tx('creator_' + card.type, card.type === 'cloze' ? 'Cloze' : card.type === 'reversed' ? 'Basic + Reversed' : 'Basic')];
+                if (card.includeSource) meta.push(tx('source_short', 'Source'));
+                const info = document.createElement('div'); info.className = 'creator-card-meta'; info.textContent = meta.join(' · ');
+                copy.appendChild(info);
+                const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'creator-item-btn'; edit.textContent = '✎'; edit.title = tx('edit', 'Edit');
+                edit.setAttribute('aria-label', edit.title); edit.onclick = () => nbcEditCard(index);
+                const del = document.createElement('button'); del.type = 'button'; del.className = 'creator-item-btn delete'; del.textContent = '×'; del.title = tx('remove_card', 'Remove card');
+                del.setAttribute('aria-label', del.title); del.onclick = () => nbcRemoveCard(index);
+                item.append(number, copy, edit, del);
+                list.appendChild(item);
+            });
+            $('nbc-empty').style.display = s.cards.length ? 'none' : 'block';
+            const finish = $('nbc-finish');
+            finish.disabled = pending || !(s.cards.length || d.front.trim());
+            finish.textContent = pending ? tx('creating_cards', 'Creating cards…') : finishLabel(s);
+            ['nbc-add-card', 'nbc-new-card', 'nbc-discard', 'nbc-type', 'nbc-front', 'nbc-back', 'nbc-include-source', 'nbc-deck-name'].forEach(id => { $(id).disabled = pending; });
+            panel.querySelectorAll('#nbc-cloze-tools button').forEach(b => { b.disabled = pending; });
+            updateBadge();
+        }
+        function formChanged() {
+            if (!appState.cardCreatorSession) return;
+            syncForm();
+            const s = session();
+            $('nbc-new-card').classList.toggle('show', s.editingIndex >= 0 || !!(s.draft.front || s.draft.back));
+            $('nbc-finish').disabled = pending || !(s.cards.length || s.draft.front.trim());
+            $('nbc-finish').textContent = pending ? tx('creating_cards', 'Creating cards…') : finishLabel(s);
+            persist();
+        }
+
+        // ── deck combobox ──
+        const deckKey = v => String(v || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase();
+        const deckLeaf = n => { const p = String(n || '').split('::'); return p[p.length - 1] || String(n || ''); };
+        function chooseDeck(name) { $('nbc-deck-name').value = String(name || ''); closeDeckMenu(); formChanged(); $('nbc-deck-name').focus(); }
+        function addSection(menu, label, names, query, seen) {
+            const rows = names.filter(n => { n = String(n || ''); if (!n || seen.has(n)) return false; if (query && !deckKey(n).includes(query)) return false; seen.add(n); return true; });
+            if (!rows.length) return;
+            const head = document.createElement('div'); head.className = 'deck-menu-section'; head.textContent = label; menu.appendChild(head);
+            rows.forEach(name => {
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'deck-menu-option'; b.setAttribute('role', 'option');
+                const leaf = document.createElement('span'); leaf.className = 'deck-menu-name'; leaf.textContent = deckLeaf(name); b.appendChild(leaf);
+                if (String(name).includes('::')) { const path = document.createElement('span'); path.className = 'deck-menu-path'; path.textContent = String(name).replaceAll('::', '  ›  '); b.appendChild(path); }
+                b.addEventListener('mousedown', e => e.preventDefault());
+                b.addEventListener('click', () => chooseDeck(name));
+                menu.appendChild(b);
+            });
+        }
+        function renderDeckMenu() {
+            const menu = $('nbc-deck-menu'), input = $('nbc-deck-name'), query = deckKey(input.value.trim());
+            const all = Array.isArray(window.__SYNAPSE_DECKS__) ? window.__SYNAPSE_DECKS__.map(String) : [];
+            const current = typeof window.__SYNAPSE_CURRENT_DECK__ === 'string' ? window.__SYNAPSE_CURRENT_DECK__ : '';
+            const seen = new Set();
+            menu.replaceChildren();
+            addSection(menu, tx('current_deck', 'Current deck'), current ? [current] : [], query, seen);
+            addSection(menu, tx('all_decks', 'Decks'), all.filter(n => !query || deckKey(n).includes(query)).slice(0, 60), query, seen);
+            if (!menu.querySelector('.deck-menu-option')) {
+                const empty = document.createElement('div'); empty.className = 'deck-menu-empty';
+                empty.textContent = tx('no_matching_decks', 'No matching decks. Enter a name to create one.'); menu.appendChild(empty);
+            }
+            deckIndex = -1; menu.classList.add('open'); input.setAttribute('aria-expanded', 'true');
+        }
+        function closeDeckMenu() { $('nbc-deck-menu').classList.remove('open'); $('nbc-deck-name').setAttribute('aria-expanded', 'false'); deckIndex = -1; }
+        function moveDeck(delta) {
+            const options = Array.from(panel.querySelectorAll('#nbc-deck-menu .deck-menu-option'));
+            if (!options.length) return;
+            deckIndex = (deckIndex + delta + options.length) % options.length;
+            options.forEach((o, i) => o.classList.toggle('active', i === deckIndex));
+            options[deckIndex].scrollIntoView({ block: 'nearest' });
+        }
+        const deckInput = $('nbc-deck-name');
+        deckInput.addEventListener('focus', renderDeckMenu);
+        deckInput.addEventListener('input', () => { renderDeckMenu(); formChanged(); });
+        deckInput.addEventListener('blur', () => setTimeout(closeDeckMenu, 120));
+        deckInput.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!$('nbc-deck-menu').classList.contains('open')) renderDeckMenu(); moveDeck(1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); moveDeck(-1); }
+            else if (e.key === 'Enter' && deckIndex >= 0) { e.preventDefault(); const o = panel.querySelectorAll('#nbc-deck-menu .deck-menu-option')[deckIndex]; if (o) o.click(); }
+            else if (e.key === 'Escape') { e.stopPropagation(); closeDeckMenu(); }
+        });
+        $('nbc-front').addEventListener('input', formChanged);
+        $('nbc-back').addEventListener('input', formChanged);
+        $('nbc-include-source').addEventListener('change', formChanged);
+        // The editor's own shortcuts (Tab, "/" menu, block selection) must not fire while typing in the panel.
+        panel.addEventListener('keydown', e => { if (e.key !== 'Escape') e.stopPropagation(); });
+        panel.addEventListener('mousedown', e => { e.stopPropagation(); });
+
+        // ── actions ──
+        window.nbcTypeChanged = function () { if (pending) return; syncForm(); typeUi(); formChanged(); };
+        window.nbcInsertCloze = function (same) {
+            if (pending) return;
+            const el = $('nbc-front'), start = el.selectionStart, end = el.selectionEnd;
+            if (start === end) { status(tx('creator_select_cloze', 'Select the text you want to hide first.'), true); el.focus(); return; }
+            const selected = el.value.slice(start, end), before = el.value.slice(0, start);
+            if (/[{}]/.test(selected) || before.lastIndexOf('{{') > before.lastIndexOf('}}')) { status(tx('creator_plain_cloze', 'Select plain text outside an existing cloze.'), true); return; }
+            const nums = [...el.value.matchAll(/\{\{c([1-9][0-9]*)::/g)].map(m => Number(m[1]));
+            const number = same ? Math.max(1, ...nums) : Math.max(0, ...nums) + 1;
+            if (number > 999) return;
+            const replacement = '{{c' + number + '::' + selected + '}}';
+            if (el.value.length + replacement.length - selected.length > MAX_TEXT) return;
+            el.setRangeText(replacement, start, end, 'end'); el.focus(); formChanged();
+        };
+        window.nbcOpen = function (focusSide) {
+            session();
+            panel.classList.add('open');
+            document.body.classList.add('nbc-open');
+            render();
+            setTimeout(() => $(focusSide === 'back' ? 'nbc-back' : 'nbc-front').focus(), 0);
+        };
+        window.nbcClose = function () {
+            if (pending) return;
+            syncForm(); closeDeckMenu();
+            panel.classList.remove('open');
+            document.body.classList.remove('nbc-open');
+            persistNowSoon();
+        };
+        window.toggleNbCreator = function () { panel.classList.contains('open') ? nbcClose() : nbcOpen(); };
+        function clearDraft(s) { const type = s.draft.type; s.draft = { type, front: '', back: '', includeSource: s.draft.includeSource }; s.editingIndex = -1; }
+        window.nbcCommitCard = function (silent) {
+            if (pending) return false;
+            const s = session(); syncForm();
+            const d = s.draft, front = d.front.trim(), back = d.back.trim();
+            if (!front) { if (!silent) status(tx('front_required', 'Enter a front side first.'), true); $('nbc-front').focus(); return false; }
+            if (d.type === 'cloze' && !/\{\{c[1-9][0-9]{0,2}::[^{}]+\}\}/.test(front)) { status(tx('creator_cloze_required', 'Add at least one cloze deletion, for example {{c1::answer}}.'), true); return false; }
+            if (d.type === 'reversed' && !back) { status(tx('creator_reverse_required', 'Reversed cards need text on both sides.'), true); return false; }
+            if (front.length + back.length > MAX_TEXT) { status(tx('card_too_long', 'This card contains too much text.'), true); return false; }
+            if (s.cards.some((c, i) => i !== s.editingIndex && c.type === d.type && c.front.trim() === front && c.back.trim() === back)) { status(tx('duplicate_card', 'This card is already in the session.'), true); return false; }
+            const card = cleanCard({ id: s.editingIndex >= 0 ? s.cards[s.editingIndex].id : makeId(), type: d.type, front, back, includeSource: d.includeSource, source: d.includeSource ? currentPageTitle() : '' });
+            if (s.editingIndex >= 0) s.cards[s.editingIndex] = card;
+            else { if (s.cards.length >= MAX_CARDS) { status(tx('too_many_cards', 'This session already contains 500 cards.'), true); return false; } s.cards.push(card); }
+            clearDraft(s); render(); persistNowSoon();
+            if (!silent) setTimeout(() => $('nbc-front').focus(), 0);
+            return true;
+        };
+        window.nbcNewCard = function () {
+            if (pending) return;
+            const s = session(); syncForm();
+            if ((s.draft.front || s.draft.back) && s.editingIndex < 0 && !confirm(tx('discard_draft', 'Discard the unfinished card draft?'))) return;
+            clearDraft(s); render(); persist(); $('nbc-front').focus();
+        };
+        window.nbcEditCard = function (index) {
+            if (pending) return;
+            const s = session(); syncForm();
+            if (s.editingIndex !== index && (s.draft.front || s.draft.back) && !confirm(tx('discard_draft', 'Discard the unfinished card draft?'))) return;
+            const card = s.cards[index]; if (!card) return;
+            s.editingIndex = index; s.draft = { type: card.type, front: card.front, back: card.back, includeSource: card.includeSource };
+            render(); $('nbc-front').focus();
+        };
+        window.nbcRemoveCard = function (index) {
+            if (pending) return;
+            const s = session(); if (!s.cards[index]) return;
+            s.cards.splice(index, 1);
+            if (s.editingIndex === index) clearDraft(s); else if (s.editingIndex > index) s.editingIndex -= 1;
+            render(); persistNowSoon();
+        };
+        window.nbcDiscard = function () {
+            if (pending) return;
+            if (appState.cardCreatorSession && hasWork(session()) && !confirm(tx('discard_session_confirm', 'Discard this unfinished Card Creator session?'))) return;
+            delete appState.cardCreatorSession;
+            render(); updateBadge(); persistNowSoon();
+            nbcClose();
+        };
+        window.nbcFinish = function () {
+            if (pending) return;
+            let s = session(); syncForm();
+            if (s.draft.front.trim()) { if (!nbcCommitCard(true)) return; s = session(); }
+            else if (s.draft.back.trim()) { status(tx('front_required', 'Enter a front side first.'), true); $('nbc-front').focus(); return; }
+            const deckName = s.deckName.trim();
+            if (!deckName) { status(tx('deck_required', 'Choose or enter a deck name.'), true); $('nbc-deck-name').focus(); return; }
+            if (!s.cards.length) return;
+            s.deckName = deckName;
+            pending = true; render();
+            send(`${ADDON}:notes:create-batch:${JSON.stringify({
+                deckName, source: currentPageTitle(), pdfId: '',
+                cards: s.cards.map(c => ({ front: c.front, back: c.back, type: c.type, includeSource: c.includeSource, source: c.source, pages: [] }))
+            })}`);
+        };
+        // Result of the batch from Python.
+        window.onNotebookCardBatchCreated = function (success, message) {
+            pending = false;
+            if (success) {
+                const s = session(); s.cards = []; s.editingIndex = -1;
+                clearDraft(s); persistNowSoon();
+            }
+            render();
+            status(message, !success);
+        };
+        // Selected text → draft side (appends, like the PDF Card Creator).
+        window.nbcUseSelection = function (side) {
+            if (pending) return;
+            const selection = getSelection();
+            if (!selection || selection.isCollapsed || !editor.contains(selection.anchorNode)) { status(tx('nbc_select_text_first', 'Select some text in your notes first.'), true); nbcOpen(side); return; }
+            const text = selection.toString().replace(/­/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+            if (!text) return;
+            const s = session(), target = side === 'back' ? 'back' : 'front', previous = s.draft[target].trim();
+            s.draft[target] = (previous ? previous + '\n' + text : text).slice(0, MAX_TEXT);
+            nbcOpen(side);
+            status(tx(side === 'back' ? 'back_saved' : 'front_saved', side === 'back' ? 'Back saved' : 'Front saved'));
+            persist();
+            selection.removeAllRanges();
+            $('format-toolbar').style.display = 'none';
+        };
+        window.__nbcState = () => ({ pending, open: panel.classList.contains('open') });
+        // A session left over from the last run: show its card count on the button.
+        document.addEventListener('DOMContentLoaded', updateBadge);
+        updateBadge();
+        // After a (re)load: the session may have changed underneath an open panel.
+        window.nbcRefresh = function () { pending = false; updateBadge(); if (panel.classList.contains('open')) render(); };
     })();
     </script>
 </body>

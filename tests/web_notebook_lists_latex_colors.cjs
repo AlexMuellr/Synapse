@@ -238,5 +238,16 @@ const doc=blocks=>({pages:[{id:'A',title:'T',icon:'',blocks}],activePageId:'A'})
   await page.keyboard.type('(');assert.equal((await blocks())[0].latex,'(','the LaTeX source field is left alone');
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS auto-closing parentheses: pair, step over, nesting, selection, other fields');
+
+  // ---- Caret stays after the typed text when a markdown prefix converts the block ----
+  for(const [prefix,type] of [['- ','bullet'],['1. ','numbered'],['[] ','todo'],['> ','quote'],['# ','h1']]){
+   await load([{type:'text',html:''}]);await focusBlock(0);
+   await page.keyboard.type(prefix+'hello');
+   const [block]=await blocks();
+   assert.equal(block.type,type,prefix+' converts');
+   assert.equal(block.html,'hello',prefix+' keeps the typed letters in order: '+block.html);
+  }
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS markdown prefixes keep typing order (caret stays at the end)');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

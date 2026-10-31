@@ -2673,14 +2673,15 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             const newBlock = convertedBlock(parent, type, content);
             if (!newBlock) return;
             parent.replaceWith(newBlock);
-            if(type==='todo') newBlock.querySelector('.todo-content').focus();
+            // Keep the caret after the text already typed (a plain focus() would put it at the start).
+            if(type==='todo') setCaretEnd(newBlock.querySelector('.todo-content'));
             else if(type==='callout') {
                 const sel = window.getSelection(); const range = document.createRange(); range.selectNodeContents(newBlock.querySelector('.callout-content')); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
             }
             else if (type === 'toggle') { const next = createBlock('text'); newBlock.after(next); newBlock.querySelector('.toggle-title').focus(); }
             else if (type === 'divider' || type === 'table') { const next = createBlock('text'); newBlock.after(next); next.focus(); }
             else if (type === 'latex') { const next = createBlock('text'); newBlock.after(next); notebookLatexEdit(newBlock); }
-            else newBlock.focus();
+            else setCaretEnd(newBlock);
             triggerSave();
         }
 

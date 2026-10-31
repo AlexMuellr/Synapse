@@ -225,6 +225,35 @@ body.empty #start-center{display:flex}
 .notes-btn:hover{color:var(--text);background:var(--surface)}
 .notes-btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 
+/* ── Card suggestions preview ── */
+#cards-modal{display:none;position:fixed;inset:0;background:var(--overlay);
+  z-index:510;align-items:center;justify-content:center}
+#cards-modal.open{display:flex}
+#cards-modal-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;
+  width:440px;max-width:calc(100vw - 24px);max-height:90vh;display:flex;flex-direction:column;
+  padding:18px;box-shadow:0 8px 40px rgba(0,0,0,.22)}
+#cards-modal-card .cm-header{margin-bottom:8px}
+.cards-deck-row{display:flex;align-items:center;gap:8px;margin:2px 0 10px;font-size:11px;color:var(--text-muted)}
+#cards-deck{flex:1;min-width:0;font:inherit;font-size:12px;background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;padding:5px 8px;outline:none}
+#cards-list{flex:1;min-height:80px;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.card-item{border:1px solid var(--border);border-radius:10px;padding:8px 9px;margin-bottom:8px;background:var(--bg)}
+.card-item.off{opacity:.45}
+.card-item-head{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:600;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
+.card-item-head input{margin:0;accent-color:var(--accent)}
+.card-item textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:34px;font:inherit;
+  font-size:12px;line-height:1.45;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:7px;padding:5px 7px;outline:none;margin-bottom:5px}
+.card-item textarea:focus{border-color:var(--accent)}
+.card-image{display:flex;align-items:center;gap:8px;margin-top:2px}
+.card-image img{max-width:84px;max-height:64px;border-radius:6px;border:1px solid var(--border);object-fit:contain;background:#fff}
+.card-image select{font:inherit;font-size:11px;background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:3px 5px}
+.card-image .notes-btn{padding:3px 8px}
+#cards-status{font-size:11px;min-height:15px;margin-top:8px;color:var(--text-muted)}
+#cards-status.error{color:var(--error)}
+
 /* ── Chip manager modal ── */
 #chip-modal{display:none;position:fixed;inset:0;background:var(--overlay);
   z-index:500;align-items:center;justify-content:center}
@@ -390,10 +419,10 @@ body:not(.empty) #input-wrap{display:block}
 #send-btn:disabled{opacity:.22;cursor:default}
 
 /* ── Compact input footer ── */
-.input-meta-row{display:flex;align-items:center;justify-content:space-between;
-  gap:8px;margin-top:5px;padding:0 3px;min-height:27px}
-#input-wrap .card-context-row{margin-top:0;padding:0;flex:0 0 auto}
-#disclaimer{flex:1 1 auto;min-width:0;text-align:left;font-size:9.5px;
+.input-meta-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:6px 8px;margin-top:5px;padding:0 3px;min-height:27px}
+#input-wrap .card-context-row{margin-top:0;padding:0;flex:1 1 auto;flex-wrap:wrap;justify-content:flex-start}
+#disclaimer{order:2;flex:1 1 100%;min-width:0;text-align:left;font-size:9.5px;
   line-height:1.3;color:var(--text-faint);user-select:none}
 </style>
 <script>
@@ -611,6 +640,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
     </button>
   </div>
   <div class="card-context-row" data-card-context-row>
+    <button class="card-context-toggle" data-notes-cards-button type="button" onclick="startNotesCards()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v10"/></svg>
+      <span>Cards from notes</span>
+    </button>
     <button class="card-context-toggle" data-notes-button type="button" onclick="openNotesPicker()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>
       <span data-notes-label>Select notes</span><span class="context-status-dot"></span>
@@ -649,7 +682,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
   <div class="input-meta-row">
     <div id="disclaimer">AI can make mistakes &middot; Verify important information</div>
     <div class="card-context-row" data-card-context-row>
-      <button class="card-context-toggle" data-notes-button type="button" onclick="openNotesPicker()">
+      <button class="card-context-toggle" data-notes-cards-button type="button" onclick="startNotesCards()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v10"/></svg>
+      <span>Cards from notes</span>
+    </button>
+    <button class="card-context-toggle" data-notes-button type="button" onclick="openNotesPicker()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>
       <span data-notes-label>Select notes</span><span class="context-status-dot"></span>
     </button>
@@ -676,6 +713,25 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
     <div id="kh-steps"></div>
     <div class="kh-note" id="kh-note"></div>
     <button class="kh-open-btn" id="kh-open-btn"></button>
+  </div>
+</div>
+
+<!-- ── Card suggestions preview ── -->
+<div id="cards-modal">
+  <div id="cards-modal-card" role="dialog" aria-modal="true" aria-labelledby="cards-title">
+    <div class="cm-header">
+      <span class="cm-title" id="cards-title">Review cards</span>
+      <button class="cm-close" onclick="closeCardsPreview()">Close</button>
+    </div>
+    <div class="notes-hint">Check, edit or remove cards before adding them. Pictures come from your notes and are never sent to the AI.</div>
+    <div class="cards-deck-row"><label for="cards-deck">Deck</label><select id="cards-deck"></select></div>
+    <div id="cards-list"></div>
+    <div id="cards-status" role="status"></div>
+    <div class="notes-footer">
+      <span class="notes-count" id="cards-count"></span>
+      <button class="notes-btn" onclick="closeCardsPreview()">Cancel</button>
+      <button class="notes-btn primary" id="cards-add-btn" onclick="createReviewedCards()">Add cards</button>
+    </div>
   </div>
 </div>
 
@@ -1167,6 +1223,7 @@ function updateNotesButtons() {
     if (label) label.textContent = tr('Select notes') + (n ? ' (' + n + ')' : '');
     btn.title = n ? attachedNoteIds.map(function(id) { return titles[id] || id; }).join(', ') : tr('Select notes');
   });
+  if (typeof updateNotesCardsButtons === 'function') updateNotesCardsButtons();
 }
 
 function openNotesPicker() {
@@ -1295,6 +1352,182 @@ document.addEventListener('keydown', function(e) {
 document.getElementById('notes-search').addEventListener('input', renderNotesList);
 document.getElementById('notes-modal').addEventListener('mousedown', function(e) {
   if (e.target === this) closeNotesPicker();
+});
+
+// ── Cards from notes (AI suggestions, reviewed before anything is created) ───
+var cardSuggestions = [];
+var cardImages = {};
+var cardsGenerating = false;
+var cardsCreating = false;
+
+function updateNotesCardsButtons() {
+  document.querySelectorAll('[data-notes-cards-button]').forEach(function(btn) {
+    btn.disabled = busy || cardsGenerating || attachedNoteIds.length === 0;
+    btn.title = attachedNoteIds.length ? tr('Cards from notes') : tr('Select notes first.');
+  });
+}
+
+function startNotesCards() {
+  if (busy || cardsGenerating || !attachedNoteIds.length) return;
+  cardsGenerating = true;
+  setBusy(true);
+  startChat();
+  showTyping();
+  updateNotesCardsButtons();
+  sendToPython('notes_cards', { noteIds: attachedNoteIds.slice() });
+}
+
+function _cardsFinish() {
+  cardsGenerating = false;
+  hideTyping();
+  setBusy(false);
+  updateNotesCardsButtons();
+}
+
+function receiveCardsError(message) {
+  var wasCreating = cardsCreating;
+  cardsCreating = false;
+  document.getElementById('cards-add-btn').disabled = false;
+  if (document.getElementById('cards-modal').classList.contains('open') && wasCreating) {
+    var st = document.getElementById('cards-status');
+    st.textContent = message;
+    st.className = 'error';
+    return;
+  }
+  _cardsFinish();
+  receiveResponse(message, true);
+}
+
+function receiveCardSuggestions(payload) {
+  _cardsFinish();
+  cardSuggestions = ((payload && payload.cards) || []).map(function(c) {
+    return { front: c.front, back: c.back, image: c.image || null, placement: 'back', on: true };
+  });
+  cardImages = (payload && payload.images) || {};
+  var sel = document.getElementById('cards-deck');
+  sel.innerHTML = '';
+  ((payload && payload.decks) || []).forEach(function(d) {
+    var o = document.createElement('option');
+    o.value = String(d.id);
+    o.textContent = d.name;
+    if (d.id === payload.defaultDeck) o.selected = true;
+    sel.appendChild(o);
+  });
+  var st = document.getElementById('cards-status');
+  st.textContent = '';
+  st.className = '';
+  cardsCreating = false;
+  document.getElementById('cards-add-btn').disabled = false;
+  document.getElementById('cards-modal').classList.add('open');
+  renderCardSuggestions();
+}
+
+function _cardsSelectedCount() {
+  return cardSuggestions.filter(function(c) { return c.on; }).length;
+}
+
+function _updateCardsFooter() {
+  var n = _cardsSelectedCount();
+  document.getElementById('cards-count').textContent = n + ' / ' + cardSuggestions.length;
+  document.getElementById('cards-add-btn').disabled = cardsCreating || n === 0;
+}
+
+function renderCardSuggestions() {
+  var list = document.getElementById('cards-list');
+  list.innerHTML = '';
+  cardSuggestions.forEach(function(card, index) {
+    var item = document.createElement('div');
+    item.className = 'card-item' + (card.on ? '' : ' off');
+    var head = document.createElement('label');
+    head.className = 'card-item-head';
+    var box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = card.on;
+    box.addEventListener('change', function() {
+      card.on = box.checked;
+      item.classList.toggle('off', !card.on);
+      _updateCardsFooter();
+    });
+    head.appendChild(box);
+    head.appendChild(document.createTextNode(String(index + 1)));
+    item.appendChild(head);
+    [['front', tr('Front')], ['back', tr('Back')]].forEach(function(pair) {
+      var area = document.createElement('textarea');
+      area.value = card[pair[0]];
+      area.placeholder = pair[1];
+      area.setAttribute('aria-label', pair[1]);
+      area.rows = 2;
+      area.addEventListener('input', function() { card[pair[0]] = area.value; });
+      item.appendChild(area);
+    });
+    if (card.image && cardImages[card.image]) {
+      var row = document.createElement('div');
+      row.className = 'card-image';
+      var img = document.createElement('img');
+      img.src = cardImages[card.image];
+      img.alt = '';
+      var where = document.createElement('select');
+      where.setAttribute('aria-label', tr('Picture on'));
+      [['back', tr('Picture on back')], ['front', tr('Picture on front')]].forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o[0];
+        opt.textContent = o[1];
+        where.appendChild(opt);
+      });
+      where.value = card.placement;
+      where.addEventListener('change', function() { card.placement = where.value; });
+      var drop = document.createElement('button');
+      drop.type = 'button';
+      drop.className = 'notes-btn';
+      drop.textContent = tr('Remove picture');
+      drop.addEventListener('click', function() { card.image = null; renderCardSuggestions(); });
+      row.appendChild(img);
+      row.appendChild(where);
+      row.appendChild(drop);
+      item.appendChild(row);
+    }
+    list.appendChild(item);
+  });
+  _updateCardsFooter();
+}
+
+function closeCardsPreview() {
+  if (cardsCreating) return;
+  document.getElementById('cards-modal').classList.remove('open');
+}
+
+function createReviewedCards() {
+  if (cardsCreating) return;
+  var chosen = cardSuggestions.filter(function(c) { return c.on && c.front.trim(); });
+  var st = document.getElementById('cards-status');
+  if (!chosen.length) {
+    st.textContent = tr('Select at least one card with a front.');
+    st.className = 'error';
+    return;
+  }
+  cardsCreating = true;
+  document.getElementById('cards-add-btn').disabled = true;
+  st.textContent = '';
+  st.className = '';
+  sendToPython('create_cards', {
+    deckId: parseInt(document.getElementById('cards-deck').value, 10),
+    cards: chosen.map(function(c) {
+      return { front: c.front, back: c.back, image: c.image, placement: c.placement };
+    })
+  });
+}
+
+function receiveCardsCreated(count, deckName) {
+  cardsCreating = false;
+  document.getElementById('cards-modal').classList.remove('open');
+  receiveResponse(tr('Added {count} cards to “{deck}”.').replace('{count}', count).replace('{deck}', deckName), false);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('cards-modal').classList.contains('open')) {
+    e.preventDefault();
+    closeCardsPreview();
+  }
 });
 
 // ── Chip manager ──────────────────────────────────────────────────────────────
@@ -2022,6 +2255,7 @@ function clearChat() {
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function setBusy(s) {
   busy = s;
+  if (typeof updateNotesCardsButtons === 'function') updateNotesCardsButtons();
   updateSendBtn();
   updateStartSendBtn();
   updateCardContextControls();

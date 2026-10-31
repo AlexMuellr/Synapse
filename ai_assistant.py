@@ -1089,6 +1089,8 @@ def _handle_action(action: str, data: Dict[str, Any]) -> None:
         "copy_response": _action_copy_response,
         "set_card_context": _action_set_card_context,
         "list_notes":    _action_list_notes,
+        "notes_cards":   _action_notes_cards,
+        "create_cards":  _action_create_cards,
         "chip_action":   _action_chip,
         "save_settings": _action_save_settings,
         "save_chips":    _action_save_chips,
@@ -1103,6 +1105,135 @@ def _handle_action(action: str, data: Dict[str, Any]) -> None:
         handler(data)
     else:
         print(f"AI Assistant: unknown action '{action}'")
+
+
+# Images of the last card suggestion run (id -> data: URI). The web view only ever
+# names an id; the bytes written to Anki's media folder come from this cache.
+_card_images: Dict[str, str] = {}
+
+
+def _complete_text(settings: Dict[str, Any], messages: List[Dict]) -> str:
+    """Blocking, non-streaming-to-UI completion with the configured provider."""
+    provider  = settings.get("provider", "?")
+    model     = _normalize_model(settings.get("model", ""))
+    api_key   = settings.get("apiKey", "")
+    ollama_ep = settings.get("ollamaEndpoint", OLLAMA_EP_DEFAULT)
+    llama_ep  = settings.get("llamaEndpoint", LLAMA_EP_DEFAULT)
+    if not model:
+        raise RuntimeError(_("Model not found. Choose another model in Settings."))
+    parts: List[str] = []
+    on_chunk = parts.append
+    if provider == "openai":
+        _stream_openai_compat("https://api.openai.com/v1/chat/completions", api_key, model, messages,
+                              on_chunk, token_param="max_completion_tokens", max_tokens=4096)
+    elif provider == "deepseek":
+        _stream_openai_compat("https://api.deepseek.com/chat/completions", api_key, model, messages,
+                              on_chunk, timeout=180, max_tokens=None)
+    elif provider == "gemini":
+        _stream_gemini(api_key, model, messages, on_chunk)
+    elif provider == "openrouter":
+        _stream_openai_compat("https://openrouter.ai/api/v1/chat/completions", api_key, model, messages,
+                              on_chunk, extra_headers={"HTTP-Referer": "https://synapse-pro.vercel.app/",
+                                                       "X-Title": "SynapsePro"}, max_tokens=4096)
+    elif provider == "anthropic":
+        _stream_anthropic(api_key, model, messages, on_chunk)
+    elif provider == "ollama":
+        _stream_ollama(model, messages, ollama_ep, on_chunk)
+    elif provider == "llamaserver":
+        _stream_openai_compat(f"{llama_ep.rstrip('/')}/v1/chat/completions", api_key, model, messages,
+                              on_chunk, timeout=180, max_tokens=4096)
+    else:
+        raise RuntimeError(f"Unknown provider: '{provider}'")
+    return "".join(parts)
+
+
+def _card_error(message: str, generation: Optional[int] = None) -> None:
+    _js_on_main(f"receiveCardsError({json.dumps(message)});", generation)
+
+
+def _action_notes_cards(data: Dict[str, Any]) -> None:
+    """Ask the AI for card suggestions from the selected pages; the user reviews them first."""
+    settings = _load_settings()
+    if not _is_configured(settings["provider"], settings["apiKey"]):
+        _card_error(_("No API key configured. Open Settings to get started."))
+        return
+    note_ids = _clean_note_ids(data.get("noteIds"))
+    if not note_ids:
+        _card_error(_("Select notes first."))
+        return
+    from . import notebook_cards, notebook_text
+    collector = notebook_text.ImageCollector()
+    context = notebook_text.pages_to_context(_load_notebook_body(), note_ids, images=collector)
+    if not context:
+        _card_error(_("The selected notes were not found. Select them again."))
+        return
+    images = collector.referenced(context)
+    prompt = notebook_cards.build_prompt(context, _lang_suffix(), bool(images))
+    decks: List[Dict[str, Any]] = []
+    default_deck = None
+    try:
+        decks = [{"id": int(d.id), "name": str(d.name)}
+                 for d in mw.col.decks.all_names_and_ids(skip_empty_default=True, include_filtered=False)]
+        default_deck = int(mw.col.decks.get_current_id())
+    except Exception as exc:
+        print(f"AI Assistant: could not list decks: {exc}")
+    if not decks:
+        _card_error(_("No decks found."))
+        return
+    generation = _session_generation
+
+    def worker() -> None:
+        try:
+            text = _complete_text(settings, [{"role": "user", "content": prompt}])
+        except Exception as exc:
+            print(f"AI Assistant: card generation failed [{type(exc).__name__}]: {exc}")
+            _card_error(_classify_error(exc, settings.get("provider", "")), generation)
+            return
+        cards = notebook_cards.parse_cards(text, images)
+        if not cards:
+            _card_error(_("The AI did not return usable cards. Try again."), generation)
+            return
+        used = {c["image"] for c in cards if c["image"]}
+        shown = {key: value for key, value in images.items() if key in used}
+        _card_images.clear()
+        _card_images.update(shown)
+        payload = {"cards": cards, "images": shown, "decks": decks, "defaultDeck": default_deck}
+        _js_on_main(f"receiveCardSuggestions({json.dumps(payload)});", generation)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
+def _action_create_cards(data: Dict[str, Any]) -> None:
+    """Add the user-approved cards. Image bytes come from the local cache, not the web view."""
+    from . import notebook_cards
+    try:
+        notes_data = notebook_cards.prepare_notes(data.get("cards"), dict(_card_images))
+        deck_id = int(data.get("deckId"))
+        deck = mw.col.decks.get(deck_id)
+        if not deck:
+            raise ValueError("unknown deck")
+        from anki.collection import AddNoteRequest
+        from .pdf_card_types import resolve
+        notetype = resolve(mw.col, "basic")
+        requests = []
+        for item in notes_data:
+            front_html, back_html = item["front"], item["back"]
+            if item["media"]:
+                name, content = item["media"]
+                stored = mw.col.media.write_data(name, content)
+                if stored != name:
+                    front_html = front_html.replace(name, stored)
+                    back_html = back_html.replace(name, stored)
+            note = mw.col.new_note(notetype)
+            note.fields[0] = front_html
+            note.fields[1] = back_html
+            requests.append(AddNoteRequest(note=note, deck_id=deck_id))
+        mw.col.add_notes(requests)
+    except Exception as exc:
+        print(f"AI Assistant: could not create cards [{type(exc).__name__}]: {exc}")
+        _run_js(f"receiveCardsError({json.dumps(_('Could not create the cards.'))});")
+        return
+    _run_js(f"receiveCardsCreated({len(requests)}, {json.dumps(str(deck['name']))});")
 
 
 def _action_list_notes(_data: Dict[str, Any]) -> None:

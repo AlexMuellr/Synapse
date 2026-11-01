@@ -11,7 +11,13 @@ Vietnamese, Simplified Chinese, Hindi and Polish.
   extension of the existing native/HTML catalogs.
 - `workspace_translations.json`: Notebook, MindMap and FreeMap vocabulary.
 - `web_i18n.py`: exact sources sent to the Settings and AI HTML surfaces.
-- Notebook/Todo/PDF and MindMap build their keyed payloads in their Python sidebar modules.
+- Notebook/Todo/PDF/Changes (sync) and MindMap build their keyed payloads in their Python sidebar
+  modules (`STRINGS` in `notebook_sidebar.py`; the Changes tab uses the `sync` payload).
+- Strings for the AI chat's note picker, card suggestions and card preview are listed in the `ai`
+  surface of `web_i18n.py`; Python-side messages use `_()`.
+- Every new source string needs all nine translations in `web_translations.py` (or another
+  catalog); `tests/test_translation_coverage.py` fails otherwise, including placeholders such as
+  `{count}`.
 
 Lookup falls through **per language**, so a German-only entry cannot hide a French
 translation from another catalog. Workspace strings are available before a sidebar

@@ -24,7 +24,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_notebook_settings_button_uses_its_existing_bridge(self):
         tree=ast.parse((ROOT/'notebook_sidebar.py').read_text())
         fn=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_build_nav_html')
-        env={'workspace_preferences':type('Prefs',(),{'enabled':staticmethod(lambda group:dict.fromkeys(['notebook','todo','pdf'],True))}), '_':lambda x:x,'_NAV_ICONS':dict.fromkeys(['notebook','todo','pdf'],''),'_NAV_LABELS':dict(zip(['notebook','todo','pdf'],['Notebook','To-Do','PDF'])),'ADDON_NAME_FOR_BRIDGE':'synapse-notebook'}
+        env={'workspace_preferences':type('Prefs',(),{'enabled':staticmethod(lambda group:dict.fromkeys(['notebook','todo','pdf'],True))}), '_':lambda x:x,'_NAV_ICONS':dict.fromkeys(['notebook','todo','pdf','sync'],''),'_NAV_LABELS':dict(zip(['notebook','todo','pdf','sync'],['Notebook','To-Do','PDF','Changes'])),'_sync_dirty_flag':lambda:False,'ADDON_NAME_FOR_BRIDGE':'synapse-notebook'}
         env.update(dict.fromkeys(['_WIN_ICON','_WIN_ICON_CLOSE','_FS_ICON','_FS_ICON_EXIT'],''))
         exec(compile(ast.Module(body=[fn],type_ignores=[]),'notebook-nav','exec'),env)
         for tool in ('notebook','todo','pdf'):

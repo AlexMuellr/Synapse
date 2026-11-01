@@ -190,5 +190,64 @@ const doc=blocks=>({pages:[{id:'A',title:'T',icon:'',blocks}],activePageId:'A'})
   await page.evaluate(()=>document.body.classList.remove('nightMode'));
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS word colors: partial/multi-block selection, reset, combinations, undo/redo, persistence, dark mode');
+
+  // ---- Slash menu fixes ----
+  const menuOpen=()=>page.evaluate(()=>document.getElementById('slash-menu').style.display==='block');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('a/b');assert.equal(await menuOpen(),false,'a "/" inside a word does not open the menu');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('/');assert.equal(await menuOpen(),true,'"/" at the start opens the menu');
+  await page.keyboard.type('zzz');assert.equal(await menuOpen(),false,'menu closes when nothing matches');
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('see /h');assert.equal(await menuOpen(),true,'"/" after a space opens the menu');
+  await page.keyboard.type('x ');assert.equal(await menuOpen(),false,'typing on past the command closes it');
+  for(const [command,type] of [['/h1','h1'],['/h2','h2'],['/h3','h3']]){
+   await load([{type:'text',html:''}]);await focusBlock(0);
+   await page.keyboard.type(command);await page.keyboard.press('Enter');
+   const [block]=await blocks();
+   assert.equal(block.type,type,command+' converts');
+   assert.equal(block.html.replace(/<br>|&nbsp;/g,'').trim(),'',command+' leaves no digit or text behind: '+block.html);
+  }
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('/h1');await page.keyboard.press('Enter');await page.keyboard.type('Title');
+  assert.equal((await blocks())[0].html,'Title','typing continues cleanly in the new heading');
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS slash menu: closes without match, only opens for commands, /h1-/h3 leave no digit');
+
+  // ---- Auto-closing parentheses ----
+  const caretIn=()=>page.evaluate(()=>{const s=getSelection(),n=s.anchorNode;return n?[n.textContent.slice(0,s.anchorOffset),n.textContent.slice(s.anchorOffset)]:null;});
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('(');
+  assert.deepEqual(await caretIn(),['(',')'],'"(" writes "()" with the caret inside');
+  await page.keyboard.type('abc');assert.equal((await blocks())[0].html,'(abc)');
+  await page.keyboard.type(')');assert.equal((await blocks())[0].html,'(abc)','typing ")" steps over the existing one');
+  await page.keyboard.type(' x');assert.equal((await blocks())[0].html.replace('&nbsp;',' '),'(abc) x','typing continues after the pair');
+  await page.keyboard.type('(()');assert.equal((await blocks())[0].html.replace('&nbsp;',' '),'(abc) x(())','nested pairs stay balanced');
+  await load([{type:'text',html:'select me'}]);await focusBlock(0);
+  await page.evaluate(()=>{const n=editor.children[0].firstChild,r=document.createRange();r.setStart(n,0);r.setEnd(n,6);const s=getSelection();s.removeAllRanges();s.addRange(r);});
+  await page.keyboard.type('(');assert.equal((await blocks())[0].html.startsWith('()'),false,'a selection is replaced by "(", not wrapped in a pair');
+  await load([{type:'toggle',html:'',body:'',open:true},{type:'todo',html:'',checked:false},{type:'code',html:''}]);
+  for(const [i,sel] of [[0,'.toggle-title'],[1,'.todo-content'],[2,null]]){
+   await page.evaluate(([i,sel])=>{const el=editor.children[i],f=sel?el.querySelector(sel):el;f.focus();const r=document.createRange();r.selectNodeContents(f);r.collapse(true);const s=getSelection();s.removeAllRanges();s.addRange(r);},[i,sel]);
+   await page.keyboard.type('(x');
+   const html=(await blocks())[i].html;
+   assert.equal(html,'(x)','pairs work in '+(sel||'code blocks'));
+  }
+  await load([{type:'latex',html:'',latex:''}]);
+  await page.evaluate(()=>notebookLatexEdit(editor.children[0]));
+  await page.keyboard.type('(');assert.equal((await blocks())[0].latex,'(','the LaTeX source field is left alone');
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS auto-closing parentheses: pair, step over, nesting, selection, other fields');
+
+  // ---- Caret stays after the typed text when a markdown prefix converts the block ----
+  for(const [prefix,type] of [['- ','bullet'],['1. ','numbered'],['[] ','todo'],['> ','quote'],['# ','h1']]){
+   await load([{type:'text',html:''}]);await focusBlock(0);
+   await page.keyboard.type(prefix+'hello');
+   const [block]=await blocks();
+   assert.equal(block.type,type,prefix+' converts');
+   assert.equal(block.html,'hello',prefix+' keeps the typed letters in order: '+block.html);
+  }
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS markdown prefixes keep typing order (caret stays at the end)');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -39,6 +39,10 @@ Additional features include:
 - A redesigned music player with local audio and optional SoundCloud support
 - Light and dark modes, multiple color themes, and multilingual interface text
 - Full-screen workspaces for Notebook, Mind Map, and Website Viewer
+- Notebook blocks for nested and numbered lists, LaTeX formulas, and colored words, plus a
+  Card Creator and AI card suggestions from selected notes ([details](docs/NOTEBOOK.md))
+- Optional sync of notes and tasks between computers through a private Git repository or
+  a shared folder ([details](docs/NOTEBOOK_SYNC.md))
 
 ## What's new in 1.6.0
 

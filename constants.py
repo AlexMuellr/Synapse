@@ -64,6 +64,11 @@ SIDEBAR_SHORTCUT_KEYS = (
     "notebook_enabled",
 )
 
+# The notebook's "highlight selected text" shortcut is handled by the notebook page itself, not by a
+# global QShortcut. It is edited with the same recorder as the sidebar shortcuts under this key.
+NOTEBOOK_HIGHLIGHT_KEY = "notebook_highlight"
+NOTEBOOK_HIGHLIGHT_DEFAULT = "Ctrl+Shift+H"
+
 # --- Filenames & Object Names (Launcher & Submodules) ---
 LOGO_FILENAME = "logo.svg"
 MUSIC_ICON_FILENAME = "music.svg"

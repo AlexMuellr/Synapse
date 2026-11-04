@@ -153,6 +153,14 @@ class GitSyncTests(unittest.TestCase):
         self.assertFalse((pathlib.Path(self.pc.folder) / 'todos').exists())
         self.assertTrue((pathlib.Path(self.pc.folder) / 'notebook').exists())
 
+    def test_attribute_rules_are_added_to_a_repository_from_an_older_version(self):
+        old = pathlib.Path(self.pc.folder, '.gitattributes')
+        old.write_text('*.json -merge\n*.json -diff\n')
+        self.pc.set_pages([page('a')])
+        self.pc.sync(push=False)
+        self.assertIn('*.pdf binary', old.read_text())
+        self.assertEqual(old.read_text().count('*.json -merge'), 1, 'existing rules are not duplicated')
+
     def test_git_errors_are_classified_and_never_prompt(self):
         with self.assertRaises(sg.GitError) as ctx:
             sg.run(['fetch', os.path.join(self.dir.name, 'nope.git')], self.pc.folder, 10)

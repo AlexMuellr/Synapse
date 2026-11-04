@@ -515,6 +515,23 @@ function now() {
 
 document.getElementById("auto-cleanup").checked=autoCleanup;
 // ── Load / Save ───────────────────────────────────
+// Scroll position: Python keeps it while Anki runs, so switching tabs does not jump back to the top.
+let todoScrollTimer = null, todoScrollRestored = false;
+function todoRestoreScroll() {
+  const wrap = document.getElementById('todo-list-wrap');
+  const saved = Number((window.__SYNAPSE_VIEW_STATE__ || {}).scroll);
+  if (!wrap || todoScrollRestored || !Number.isFinite(saved) || saved <= 0) return;
+  todoScrollRestored = true;
+  wrap.scrollTop = saved;
+  setTimeout(() => { if (wrap.scrollTop < saved - 2) wrap.scrollTop = saved; }, 120);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const wrap = document.getElementById('todo-list-wrap');
+  if (wrap) wrap.addEventListener('scroll', () => {
+    clearTimeout(todoScrollTimer);
+    todoScrollTimer = setTimeout(() => { if (typeof pycmd === 'function') pycmd('notion_mini:view:' + JSON.stringify({ tool: 'todo', state: { scroll: Math.round(wrap.scrollTop) } })); }, 200);
+  }, { passive: true });
+});
 window.loadTodos = function(jsonStr) {
   try {
     const parsed = JSON.parse(jsonStr);
@@ -524,6 +541,7 @@ window.loadTodos = function(jsonStr) {
   }
   syncTags();
   render();
+  todoRestoreScroll();
 };
 
 function save() {

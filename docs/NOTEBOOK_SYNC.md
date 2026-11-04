@@ -25,9 +25,10 @@ Stored per profile in `SynapsePro_Data/addon_settings.json`.
 | `sync_auto_pull` | on | Pull and merge shortly after Anki starts |
 | `sync_auto_push` | off | Push when Anki closes (10 s time limit) |
 | `sync_notebook` / `sync_todos` | on | What is synced |
+| `sync_pdfs` | **off** | PDF library, folders and files (see below). Off by default because files are large |
 | `sync_first` | `merge` | `merge`, `local` or `remote`; only used for the very first sync |
 
-PDFs, progress, mind maps, add-on settings and music are **not** synced yet. API keys are never synced.
+Progress, mind maps, add-on settings and music are **not** synced yet. API keys are never synced.
 
 ## Folder layout
 ```
@@ -38,11 +39,23 @@ notebook/templates/<id>.json     page templates
 notebook/pages-deleted.json      ids of deleted pages (also folders-, templates-)
 todos/tasks/<id>.json            one file per task
 todos/tasks-deleted.json
+pdfs/entries/<id>.json           PDF library entries (without the local path)
+pdfs/folders/<id>.json           PDF folders
+pdfs/files/<id>.pdf              the PDF files themselves (only with sync_pdfs)
+pdfs/entries-deleted.json  pdfs/folders-deleted.json
 .gitattributes  .gitignore       written when Git is used
 ```
 File names are the id when it is harmless (`[A-Za-z0-9][A-Za-z0-9._-]{0,99}`), otherwise `x-<sha1>`, so an id can never become a path. JSON is written canonically (sorted keys) and only when the content changed, which keeps Git diffs small.
 
 Not part of the files: view state at the top of the snapshot (open page, sidebar) and unknown top-level keys stay local. Pages without an id and duplicate ids stay local and untouched. A notebook that still uses the old block-list format must be opened once; an empty, never-opened notebook counts as empty.
+
+## PDFs (optional)
+Turn on **PDFs** under *What to sync*. Entries and folders merge exactly like pages; a folder move or rename is just another entry change.
+- An entry's `path` only means something on its own computer, so it is **never exported**. Reading position of the viewer, recent decks and the Card Creator session stay local too.
+- **Files:** your own file is copied to `pdfs/files/<id>.pdf` (and re-copied when it changes). On another computer a file that only exists in the sync folder is copied into `SynapsePro_Data/synced_pdfs/` and the entry points there. Files you added yourself are never overwritten or deleted by sync; only copies sync made are refreshed or removed (when the entry is deleted everywhere).
+- **Size:** files above 50 MB (`MAX_PDF_SYNC_BYTES`) sync as library entries only; the result message says how many. An entry without a file on a computer appears as missing in the PDF tab and can be relinked there.
+- **Repository size:** every version of a PDF stays in Git history. For many or large PDFs use Git LFS (`git lfs track "*.pdf"` in the sync folder) or let Dropbox carry the folder (Git off). `.gitattributes` marks `*.pdf` as binary; repositories from older versions get the rule added automatically.
+- The Changes tab lists PDF entries and folders next to pages and tasks, and the tab turns red for unsynced PDF changes.
 
 ## Merge rules
 Each device keeps `SynapsePro_Data/sync_state.json` (device id, the hash of every entry as of the last sync, time of last sync). It is never synced. For every entry, local (database), remote (folder) and base (last sync) are compared:
@@ -82,7 +95,7 @@ Git commands run without a shell or prompts (`GIT_TERMINAL_PROMPT=0`, SSH `Batch
 ## Code map
 | File | Role |
 | --- | --- |
-| `notebook_sync.py` | Entry files, three-way merge, state file (pure, no Anki) |
+| `notebook_sync.py` | Entry files, three-way merge, PDF files, state file (pure, no Anki) |
 | `sync_git.py` | Non-interactive Git wrapper: status, commit, pull, push, clone |
 | `sync_manager.py` | The phases `pull`, `merge`, `publish` and `sync_once` |
 | `sync_service.py` | `SyncController`: settings, status, runs; Anki access through an `io` object |
@@ -95,4 +108,4 @@ Git commands run without a shell or prompts (`GIT_TERMINAL_PROMPT=0`, SSH `Batch
 ## Known limits
 - Not tested against real remotes or on Windows; only local repositories were used.
 - Pages are the smallest unit: two edits of the same page on two computers become two pages, not one merged page.
-- Pictures are stored inside pages, so the repository grows with them.
+- Pictures are stored inside pages, so the repository grows with them; PDF files (if enabled) grow it much faster.

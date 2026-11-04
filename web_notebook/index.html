@@ -326,6 +326,20 @@
         #editor > .bullet[data-indent="4"], #editor > .todo-wrapper[data-indent="4"] { counter-reset: nb5; }
         #editor > .bullet[data-indent="5"], #editor > .todo-wrapper[data-indent="5"] { counter-reset: none; }
         
+        /* ── Inline formulas ── */
+        .math-inline { display: inline; padding: 0 .14em; margin: 0 .02em; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .math-inline:hover, .math-inline.editing { background: var(--hover-bg); }
+        .math-inline.editing { outline: 2px solid var(--synapse-primary, #0071D3); outline-offset: 0; }
+        .math-inline:not([data-rendered])::before { content: "$" attr(data-latex) "$"; font: .88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text-gray); }
+        .math-inline[data-rendered] .katex { font-size: 1.08em; }
+        .math-inline.invalid { box-shadow: inset 0 -2px 0 #b75e5e; }
+        #nb-math-popover { position: fixed; z-index: 6500; width: 320px; max-width: calc(100vw - 16px); padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); cursor: default; }
+        #nb-math-popover[hidden] { display: none; }
+        #nb-math-input { display: block; width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--hover-bg); color: var(--text); outline: none; }
+        #nb-math-input:focus { border-color: var(--synapse-primary, #0071D3); }
+        #nb-math-error { color: #b75e5e; font-size: 11px; line-height: 1.35; margin-top: 4px; white-space: pre-wrap; }
+        #nb-math-error:empty { display: none; }
+        #nb-math-hint { color: var(--text-gray); font-size: 10.5px; margin-top: 4px; }
         .block.latex-block { padding: 4px 6px; }
         .latex-preview { text-align: center; padding: 8px 6px; min-height: 28px; overflow-x: auto; border-radius: 6px; cursor: pointer; outline: none; }
         .latex-block:hover .latex-preview, .latex-preview:focus-visible { background: var(--hover-bg); }
@@ -337,6 +351,12 @@
         .latex-error[hidden] { display: none; }
         .latex-preview .katex-display { margin: 0.2em 0; }
 
+        .block.numbered[data-start]:not([data-indent]) { counter-set: nb0 var(--nb-start); }
+        .block.numbered[data-start][data-indent="1"] { counter-set: nb1 var(--nb-start); }
+        .block.numbered[data-start][data-indent="2"] { counter-set: nb2 var(--nb-start); }
+        .block.numbered[data-start][data-indent="3"] { counter-set: nb3 var(--nb-start); }
+        .block.numbered[data-start][data-indent="4"] { counter-set: nb4 var(--nb-start); }
+        .block.numbered[data-start][data-indent="5"] { counter-set: nb5 var(--nb-start); }
         /* Stored colors are theme independent; show readable variants in Anki's dark mode. */
         body.nightMode #editor [style*="color: rgb(120, 119, 116)"], body.nightMode #notebook-popup [style*="color: rgb(120, 119, 116)"] { color: #979a9b !important; }
         body.nightMode #editor [style*="color: rgb(159, 107, 83)"], body.nightMode #notebook-popup [style*="color: rgb(159, 107, 83)"] { color: #b9856f !important; }
@@ -908,6 +928,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             <svg width="16" height="14" viewBox="0 0 24 24" style="pointer-events:none"><rect x="3" y="6" width="18" height="12" rx="2" fill="#e3d4b3"/></svg>
         </button>
         <button class="fmt-btn" onmousedown="event.preventDefault(); openNotebookColors(this, false)" title="Color" data-i18n-title="color">A ▾</button>
+        <button class="fmt-btn" id="nb-highlight-btn" onmousedown="event.preventDefault(); notebookHighlightSelection()" title="Highlight with the last color" aria-label="Highlight with the last color" data-i18n-aria-label="highlight_selection" style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 7px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+            <span class="nb-hl-swatch" style="width:14px;height:3px;border-radius:2px;background:#fff0b3;pointer-events:none"></span>
+        </button>
         <button class="fmt-btn" onmousedown="event.preventDefault(); notebookInline('strikeThrough')" title="Strikethrough" data-i18n-title="strikethrough"><s>S</s></button>
         <button class="fmt-btn" onmousedown="event.preventDefault(); notebookInline('code')" title="Inline code" data-i18n-title="inline_code">&lt;/&gt;</button>
         <div style="width:1px;height:16px;background:rgba(128,128,128,0.35);margin:0 2px"></div>
@@ -1113,7 +1137,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             updateNotebookNavigation();
         }
         function captureNotebookCheckpoint() {
-            return {pages:new Map(appState.pages.map(page=>[page.id,JSON.stringify(page)])),order:appState.pages.map(page=>page.id),root:new Map(Object.entries(appState).filter(([key])=>key!=='pages'&&key!=='sidebarOpen'&&key!=='cardCreatorSession').map(([key,value])=>[key,JSON.stringify(value)]))};
+            return {pages:new Map(appState.pages.map(page=>[page.id,JSON.stringify(page)])),order:appState.pages.map(page=>page.id),root:new Map(Object.entries(appState).filter(([key])=>key!=='pages'&&key!=='sidebarOpen'&&key!=='cardCreatorSession'&&key!=='highlightColor').map(([key,value])=>[key,JSON.stringify(value)]))};
         }
         function updateNotebookNavigation() {
             document.getElementById('notebook-back').disabled = notebookActionIndex === 0;
@@ -1265,6 +1289,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
             loadPage(appState.activePageId, false);
             if (window.nbcRefresh) window.nbcRefresh();
+            notebookUpdateHighlightButton();
             // Always start with the page list collapsed. The sidebar is already
             // 'closed' in the markup, so removing the class here would animate
             // it open→closed on startup (the "flap" effect). Keep it closed and
@@ -1287,8 +1312,49 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             if(doSave) triggerSave();
         }
 
+        // Scroll position per page. Python keeps it while Anki runs, so a tab switch (which reloads this
+        // page) lands where the reader left off.
+        const notebookScroll = (() => {
+            const saved = (window.__SYNAPSE_VIEW_STATE__ || {}).scroll;
+            const map = {};
+            if (saved && typeof saved === 'object') Object.keys(saved).slice(0, 100).forEach(key => { if (Number.isFinite(saved[key])) map[key] = saved[key]; });
+            return map;
+        })();
+        let notebookScrollTimer = null, notebookRestoreToken = 0;
+        function notebookScroller() { return document.querySelector('.scroll-wrapper'); }
+        function notebookReportScroll() {
+            const scroller = notebookScroller();
+            if (!scroller || !appState.activePageId) return;
+            notebookScroll[appState.activePageId] = Math.round(scroller.scrollTop);
+            const keys = Object.keys(notebookScroll);
+            if (keys.length > 100) delete notebookScroll[keys[0]];
+            send(`${ADDON}:view:${JSON.stringify({ tool: 'notebook', state: { page: appState.activePageId, scroll: notebookScroll } })}`);
+        }
+        // Put the page back where it was. Images and formulas change the height after the first layout,
+        // so the position is applied again a few times until the reader scrolls themselves.
+        function notebookRestoreScroll(pageId) {
+            const scroller = notebookScroller();
+            if (!scroller) return;
+            const target = notebookScroll[pageId] || 0, token = ++notebookRestoreToken;
+            let last = target;
+            const apply = () => {
+                if (token !== notebookRestoreToken) return;
+                if (Math.abs(scroller.scrollTop - last) > 2) return;   // the reader scrolled themselves: leave it
+                scroller.scrollTop = target; last = scroller.scrollTop;
+            };
+            scroller.scrollTop = target; last = scroller.scrollTop;
+            if (target) [60, 250, 800].forEach(delay => setTimeout(apply, delay));
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const scroller = notebookScroller();
+            if (scroller) scroller.addEventListener('scroll', () => {
+                clearTimeout(notebookScrollTimer);
+                notebookScrollTimer = setTimeout(notebookReportScroll, 200);
+            }, { passive: true });
+        });
         function loadPage(pageId, saveCurrent = true) {
             if (!appState.pages.some(p => p.id === pageId)) return;
+            if (saveCurrent && appState.activePageId && appState.activePageId !== pageId) notebookReportScroll();
             notebookResetMediaUi();
             clearNotebookSidebarDrag();
             notebookEditingBlock = null; notebookHoveredBlock = null;
@@ -1327,6 +1393,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             pushUndoSnapshot(); // Initial state also covers the first short edit.
             rememberNotebookPage(pageId);
             if(typeof notebookUpdateOutline==='function')notebookUpdateOutline();
+            notebookRestoreScroll(pageId);
         }
 
         function saveCurrentEditorToState() {
@@ -1389,6 +1456,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 if (blocks.length > start && notebookListBlock(child)) {
                     const indent = notebookIndentOf(child);
                     if (indent) blocks[start].indent = indent; else delete blocks[start].indent;
+                    const first = child.classList.contains('numbered') ? notebookStartOf(child) : 0;
+                    if (first > 1) blocks[start].start = first; else delete blocks[start].start;
                 }
                 if (blocks.length > start) {storedBlocks.set(child, { data: blocks[start], signature: blockSignature(child) });if(child.classList.contains('table-container'))notebookTableBaseline.set(child,child.querySelector('table').innerHTML);}
             });
@@ -2052,9 +2121,17 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
         });
 
+        // An inline formula is stored as <span class="math-inline" data-latex="…"></span>: only the source,
+        // never the rendered KaTeX markup or editor state, however the HTML reached us.
+        const NOTEBOOK_MATH_LIMIT = 2000;
         function sanitizeUserHtml(raw) {
             const tpl = document.createElement('template');
             tpl.innerHTML = String(raw || '');
+            tpl.content.querySelectorAll('.math-inline').forEach(el => {
+                const latex = (el.getAttribute('data-latex') || '').slice(0, NOTEBOOK_MATH_LIMIT);
+                Array.from(el.attributes).forEach(attribute => el.removeAttribute(attribute.name));
+                el.className = 'math-inline'; el.setAttribute('data-latex', latex); el.textContent = '';
+            });
             tpl.content.querySelectorAll('script,iframe,object,embed,link,meta,base,svg,math,form').forEach(el => el.remove());
             tpl.content.querySelectorAll('*').forEach(el => {
                 Array.from(el.attributes).forEach(attr => {
@@ -2081,6 +2158,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             copy.classList.remove('block-selected', 'nb-hover');
             copy.querySelectorAll('mark.search-highlight').forEach(mark => mark.replaceWith(...mark.childNodes));
             copy.querySelectorAll('.cloze-cover').forEach(el => el.classList.remove('revealed'));
+            copy.querySelectorAll('.math-inline').forEach(el => { const latex = el.getAttribute('data-latex') || ''; Array.from(el.attributes).forEach(a => el.removeAttribute(a.name)); el.className = 'math-inline'; el.setAttribute('data-latex', latex); el.textContent = ''; });
             return copy.outerHTML + '|' + Array.from(block.querySelectorAll('input')).map(el => el.checked).join(',');
         }
 
@@ -2104,6 +2182,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 }
             }
             if (notebookListBlock(block)) notebookSetIndent(block, data.indent);
+            if (block.classList.contains('numbered')) notebookSetStart(block, data.start);
             if (block.classList.contains('latex-block')) notebookLatexSet(block, typeof data.latex === 'string' ? data.latex : '');
             if(block.classList.contains('table-container')){notebookApplyTableOptions(block,data.tableOptions);notebookTableBaseline.set(block,block.querySelector('table').innerHTML);}
             // Record the DOM after applying the read-only protection.
@@ -2122,7 +2201,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return (block.querySelector('.todo-content, .callout-content') || block).innerHTML;
         }
 
-        function convertedBlock(block, type, html = blockHtml(block)) {
+        function convertedBlock(block, type, html = blockHtml(block), start) {
             // Never turn nonempty content into a structural block with no text slot.
             if ((type === 'divider' || type === 'table') && html.trim()) return null;
             // Converting away from a filled formula would hide its source.
@@ -2132,6 +2211,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             if (previous.type && !['text','h1','h2','h3','bullet','numbered','todo','quote','callout','code','toggle','table','divider','latex'].includes(previous.type)) return null;
             if (type === 'toggle' && block.classList.contains('toggle')) return createStoredBlock(previous);
             const converted = { ...previous, type, html, ...(type === 'toggle' ? {body: '', open: true} : {}) };
+            if (type !== 'numbered') delete converted.start;
+            else if (start !== undefined) { if (start > 1) converted.start = start; else delete converted.start; }
             if (type === 'latex') { const holder = document.createElement('div'); holder.innerHTML = html; converted.latex = holder.textContent; converted.html = ''; }
             else delete converted.latex;
             // Nesting only belongs to list items; carry the live level across list conversions.
@@ -2142,7 +2223,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
 
         function stripCommandPrefix(html, numbered = false) {
             const holder = document.createElement('div'); holder.innerHTML = html;
-            const match = holder.textContent.match(numbered ? /^(?:1\. )/ : /^(?:### |## |# |- |\[\] |> |\/[a-z0-9]+ ?)/i);
+            const match = holder.textContent.match(numbered ? /^\d{1,4}\. / : /^(?:### |## |# |- |\[\] |> |\/[a-z0-9]+ ?)/i);
             if (!match) return html;
             let remaining = match[0].length;
             const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
@@ -2254,7 +2335,196 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return block;
         }
 
+        // --- Inline formulas ($…$) -----------------------------------------------------------------
+        // Typing "$" inserts an empty formula and opens a small editor; what is typed there is rendered
+        // straight into the text. Formulas are atomic (contenteditable=false) inside any text field, so
+        // they work in lists, toggles, callouts and tables too.
+        function notebookMathText(atom) { return '\\(' + (atom.getAttribute('data-latex') || '') + '\\)'; }
+        function notebookMathToDelimiters(html) {
+            const holder = document.createElement('div'); holder.innerHTML = html;
+            holder.querySelectorAll('.math-inline').forEach(atom => atom.replaceWith(document.createTextNode(notebookMathText(atom))));
+            return holder.innerHTML;
+        }
+        // Text of a range with formulas written as \( … \) (the browser would give the rendered glyphs).
+        function notebookRangeToText(range) {
+            const holder = document.createElement('div');
+            holder.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre-wrap;';
+            holder.appendChild(range.cloneContents());
+            holder.querySelectorAll('.math-inline').forEach(atom => atom.replaceWith(document.createTextNode(notebookMathText(atom))));
+            document.body.appendChild(holder);
+            const text = holder.innerText;
+            holder.remove();
+            return text;
+        }
+        // Renders one formula. With keepOnError the previous rendering stays while the source is invalid;
+        // the promise resolves to an error message or ''.
+        function notebookRenderMathAtom(atom, keepOnError) {
+            const latex = (atom.getAttribute('data-latex') || '').slice(0, NOTEBOOK_MATH_LIMIT);
+            if (!latex.trim()) { atom.textContent = ''; atom.removeAttribute('data-rendered'); atom.classList.remove('invalid'); return Promise.resolve(''); }
+            return notebookLoadKatex().then(katex => {
+                if ((atom.getAttribute('data-latex') || '').slice(0, NOTEBOOK_MATH_LIMIT) !== latex) return '';   // edited meanwhile
+                const options = { displayMode: false, trust: false, maxExpand: 500, maxSize: 20, strict: 'ignore', output: 'html', errorColor: '#b75e5e' };
+                try {
+                    atom.innerHTML = katex.renderToString(latex, { ...options, throwOnError: true });
+                    atom.setAttribute('data-rendered', '1'); atom.classList.remove('invalid');
+                    return '';
+                } catch (error) {
+                    atom.classList.add('invalid');
+                    if (!keepOnError || !atom.hasAttribute('data-rendered')) {
+                        atom.innerHTML = katex.renderToString(latex, { ...options, throwOnError: false });
+                        atom.setAttribute('data-rendered', '1');
+                    }
+                    return String(error && error.message || error).replace(/^KaTeX parse error:\s*/, '');
+                }
+            }, () => '');
+        }
+        function notebookHydrateMathAtom(atom) {
+            atom.contentEditable = 'false';
+            atom.setAttribute('role', 'img');
+            atom.setAttribute('aria-label', atom.getAttribute('data-latex') || '');
+            notebookRenderMathAtom(atom, false);
+        }
+        function notebookHydrateMath(root) {
+            if (root && root.querySelectorAll) root.querySelectorAll('.math-inline').forEach(notebookHydrateMathAtom);
+        }
+        const notebookMath = { atom: null, isNew: false, popover: null, input: null, error: null };
+        function notebookMathPopover() {
+            if (notebookMath.popover) return notebookMath.popover;
+            const popover = document.createElement('div'); popover.id = 'nb-math-popover'; popover.hidden = true;
+            const input = document.createElement('input'); input.id = 'nb-math-input'; input.type = 'text'; input.spellcheck = false; input.autocomplete = 'off';
+            input.setAttribute('aria-label', 'LaTeX'); input.placeholder = i18nGet('math_inline_placeholder', 'LaTeX, e.g. x^2');
+            const error = document.createElement('div'); error.id = 'nb-math-error'; error.setAttribute('role', 'alert');
+            const hint = document.createElement('div'); hint.id = 'nb-math-hint'; hint.textContent = i18nGet('math_inline_hint', 'Enter to finish · Esc to close');
+            popover.append(input, error, hint); document.body.appendChild(popover);
+            Object.assign(notebookMath, { popover, input, error });
+            input.addEventListener('input', () => {
+                const atom = notebookMath.atom; if (!atom) return;
+                atom.setAttribute('data-latex', input.value.slice(0, NOTEBOOK_MATH_LIMIT));
+                atom.setAttribute('aria-label', input.value);
+                notebookRenderMathAtom(atom, true).then(message => {
+                    if (notebookMath.atom !== atom) return;
+                    notebookMath.error.textContent = message ? i18nGet('latex_error', 'Invalid LaTeX') + ': ' + message : '';
+                    notebookMathPlace();
+                });
+                triggerSave();
+            });
+            input.addEventListener('keydown', e => {
+                if (e.isComposing) return;
+                if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) { e.preventDefault(); notebookMathClose({ caret: 'after' }); }
+                else if (e.key === 'Escape') { e.preventDefault(); notebookMathClose({ caret: 'after', escape: true }); }
+                else if (e.key === 'Tab') { e.preventDefault(); notebookMathClose({ caret: 'before' }); }
+                else if (e.key === 'Backspace' && !input.value) { e.preventDefault(); notebookMathClose({ caret: 'after', remove: true }); }
+                else if (e.key === 'ArrowLeft' && input.selectionStart === 0 && input.selectionEnd === 0) { e.preventDefault(); notebookMathClose({ caret: 'before' }); }
+                else if (e.key === 'ArrowRight' && input.selectionStart === input.value.length && input.selectionEnd === input.value.length) { e.preventDefault(); notebookMathClose({ caret: 'after' }); }
+            });
+            input.addEventListener('blur', () => setTimeout(() => { if (notebookMath.atom && document.activeElement !== input) notebookMathClose({ caret: null }); }, 0));
+            // Keystrokes in the editor box belong to the box, not to the editor's shortcuts.
+            popover.addEventListener('keydown', e => e.stopPropagation());
+            popover.addEventListener('mousedown', e => e.stopPropagation());
+            return popover;
+        }
+        function notebookMathPlace() {
+            const { atom, popover } = notebookMath; if (!atom || !popover) return;
+            const rect = atom.getBoundingClientRect();
+            popover.style.left = Math.max(8, Math.min(rect.left, innerWidth - popover.offsetWidth - 8)) + 'px';
+            const below = rect.bottom + 6, above = rect.top - popover.offsetHeight - 6;
+            popover.style.top = (below + popover.offsetHeight > innerHeight && above > 8 ? above : below) + 'px';
+        }
+        function notebookMathOpen(atom, isNew) {
+            const popover = notebookMathPopover();
+            if (notebookMath.atom && notebookMath.atom !== atom) notebookMathClose({ caret: null });
+            if (!isNew) pushUndoSnapshot();
+            Object.assign(notebookMath, { atom, isNew });
+            atom.classList.add('editing');
+            notebookMath.input.value = atom.getAttribute('data-latex') || '';
+            notebookMath.error.textContent = '';
+            popover.hidden = false;
+            notebookMathPlace();
+            notebookMath.input.focus();
+            notebookMath.input.setSelectionRange(notebookMath.input.value.length, notebookMath.input.value.length);
+        }
+        function notebookMathPutCaret(range) {
+            const field = (range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement)?.closest('[contenteditable="true"]');
+            if (!field) return;
+            field.focus();
+            const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+        }
+        // Finishes editing. An empty formula disappears (Esc on a fresh one leaves a literal "$" instead).
+        function notebookMathClose({ caret = 'after', escape = false, remove = false } = {}) {
+            const { atom, isNew, popover } = notebookMath;
+            if (!atom) return;
+            notebookMath.atom = null;
+            popover.hidden = true;
+            atom.classList.remove('editing');
+            if (!atom.parentNode) return;
+            const empty = !(atom.getAttribute('data-latex') || '').trim();
+            const range = document.createRange();
+            if (empty || remove) {
+                if (escape && isNew && !remove) {
+                    const dollar = document.createTextNode('$');
+                    atom.replaceWith(dollar);
+                    range.setStartAfter(dollar); range.collapse(true);
+                } else {
+                    range.setStartBefore(atom); range.collapse(true);
+                    atom.remove();
+                }
+                triggerSave();
+                if (caret !== null) notebookMathPutCaret(range);
+                return;
+            }
+            if (caret === 'before') range.setStartBefore(atom); else range.setStartAfter(atom);
+            range.collapse(true);
+            triggerSave();
+            if (caret !== null) notebookMathPutCaret(range);
+        }
+        editor.addEventListener('keydown', e => {
+            if (e.key !== '$' || e.defaultPrevented || e.isComposing) return;
+            if ((e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState('AltGraph')) return;
+            if (!e.target.isContentEditable || e.target.closest('code, .block.code, .latex-block, .math-inline')) return;
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0), field = e.target.closest('[contenteditable="true"]');
+            if (!field || !field.contains(range.startContainer) || !field.contains(range.endContainer)) return;
+            e.preventDefault();
+            pushUndoSnapshot();
+            const atom = document.createElement('span');
+            atom.className = 'math-inline';
+            // A selection becomes the formula's source, so "x^2" selected + "$" gives the formula x^2.
+            atom.setAttribute('data-latex', range.collapsed ? '' : range.toString().trim().slice(0, NOTEBOOK_MATH_LIMIT));
+            range.deleteContents();
+            range.insertNode(atom);
+            notebookHydrateMathAtom(atom);
+            notebookMathOpen(atom, true);
+        });
+        editor.addEventListener('click', e => {
+            const atom = e.target.closest && e.target.closest('.math-inline');
+            if (!atom || !editor.contains(atom) || !atom.parentElement?.closest('[contenteditable="true"]')) return;
+            e.preventDefault();
+            notebookMathOpen(atom, false);
+        });
+        // Copying text that contains formulas: plain text with \( … \), HTML that keeps them as formulas.
+        document.addEventListener('copy', e => notebookMathClipboard(e, false));
+        document.addEventListener('cut', e => notebookMathClipboard(e, true));
+        function notebookMathClipboard(e, cut) {
+            if (typeof selectedBlocks !== 'undefined' && selectedBlocks.size) return;
+            if (!e.clipboardData) return;
+            const selection = window.getSelection();
+            if (!selection.rangeCount || selection.isCollapsed || !editor.contains(selection.anchorNode)) return;
+            const range = selection.getRangeAt(0);
+            if (!range.cloneContents().querySelector('.math-inline')) return;
+            e.preventDefault();
+            const holder = document.createElement('div'); holder.appendChild(range.cloneContents());
+            e.clipboardData.setData('text/plain', notebookRangeToText(range));
+            e.clipboardData.setData('text/html', sanitizeUserHtml(holder.innerHTML));
+            if (cut) { pushUndoSnapshot(); range.deleteContents(); triggerSave(); }
+        }
+
         function createBlock(type = 'text', content = '', checked = false, open = true, body = '') {
+            const block = notebookCreateBlock(type, content, checked, open, body);
+            notebookHydrateMath(block);
+            return block;
+        }
+        function notebookCreateBlock(type = 'text', content = '', checked = false, open = true, body = '') {
             content = sanitizeUserHtml(content);
             body = sanitizeUserHtml(body);
             if (type === 'divider') {
@@ -2456,7 +2726,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             else if (text.startsWith('# ')) replaceWithType(el, 'h1');
             else if (text.startsWith('## ')) replaceWithType(el, 'h2');
             else if (text.startsWith('- ') || text === '/list' || text === '/list ') replaceWithType(el, 'bullet');
-            else if (text.startsWith('1. ') || text === '/numbered' || text === '/numbered ') replaceWithType(el, 'numbered', text.startsWith('1. '));
+            else if (/^\d{1,4}\. /.test(text) || text === '/numbered' || text === '/numbered ') {
+                const typed = text.match(/^(\d{1,4})\. /);
+                replaceWithType(el, 'numbered', !!typed, typed ? parseInt(typed[1], 10) : undefined);
+            }
             else if (text.startsWith('[] ') || text === '/todo' || text === '/todo ') replaceWithType(el, 'todo');
             else if (text.startsWith('> ') || text === '/quote' || text === '/quote ') replaceWithType(el, 'quote');
             
@@ -2492,7 +2765,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             const range=selection.getRangeAt(0).cloneRange(),probe=document.createRange();probe.selectNodeContents(field);
             if(atEnd)probe.setStart(range.endContainer,range.endOffset);else probe.setEnd(range.startContainer,range.startOffset);
             const fragment=probe.cloneContents();
-            return !fragment.textContent && !fragment.querySelector('img,svg,video,audio,iframe,object,table,input,.page-link');
+            return !fragment.textContent && !fragment.querySelector('img,svg,video,audio,iframe,object,table,input,.math-inline,.page-link');
         }
         function notebookSplitBlock(block, type) {
             const field=notebookEditable(block),selection=window.getSelection();
@@ -2533,6 +2806,13 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         function notebookSetIndent(el, level) {
             level = Math.min(NOTEBOOK_MAX_INDENT, Math.max(0, parseInt(level, 10) || 0));
             if (level) el.dataset.indent = level; else el.removeAttribute('data-indent');
+        }
+        // A numbered item can start at any number (e.g. typing "3. "): `start` is stored with the block.
+        const notebookStartOf = el => { const n = parseInt(el?.dataset?.start, 10); return n > 0 && n <= 9999 ? n : 0; };
+        function notebookSetStart(el, value) {
+            const n = parseInt(value, 10);
+            if (n > 1 && n <= 9999) { el.dataset.start = n; el.style.setProperty('--nb-start', n); }
+            else { el.removeAttribute('data-start'); el.style.removeProperty('--nb-start'); if (!el.getAttribute('style')) el.removeAttribute('style'); }
         }
         function notebookIndentTargets(currentEl) {
             if (selectedBlocks.size) {
@@ -2619,7 +2899,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 if(currentEl.classList.contains('todo-wrapper')) nextType = 'todo';
                 
                 const listContent = currentEl.querySelector('.todo-content') || currentEl;
-                if (nextType !== 'text' && !listContent.innerText.trim() && !listContent.querySelector('img,svg,video,audio,iframe,object,table,input')) {
+                if (nextType !== 'text' && !listContent.innerText.trim() && !listContent.querySelector('img,svg,video,audio,iframe,object,table,input,.math-inline')) {
                     if (notebookIndentOf(currentEl) > 0) { notebookIndentBlocks([currentEl], -1); return; }
                     pushUndoSnapshot();
                     const textBlock = createBlock('text'); currentEl.replaceWith(textBlock);
@@ -2629,7 +2909,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
             if (e.key === 'Backspace') {
                 const contentEl = currentEl.querySelector('.todo-content') || currentEl.querySelector('.callout-content') || currentEl;
-                if ((contentEl.innerText === '' || contentEl.innerText === '\n') && !contentEl.querySelector('img,svg,video,audio,iframe,object,table,input')) {
+                if ((contentEl.innerText === '' || contentEl.innerText === '\n') && !contentEl.querySelector('img,svg,video,audio,iframe,object,table,input,.math-inline')) {
                      if (notebookListBlock(currentEl)) {
                          e.preventDefault();
                          if (notebookIndentOf(currentEl) > 0) { notebookIndentBlocks([currentEl], -1); return; }
@@ -2666,11 +2946,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             }
         }
 
-        function replaceWithType(el, type, numberedPrefix = false) {
+        function replaceWithType(el, type, numberedPrefix = false, start) {
             pushUndoSnapshot();
             let parent = el.closest('.block') || el.closest('.todo-wrapper');
             const content = stripCommandPrefix(blockHtml(parent), numberedPrefix);
-            const newBlock = convertedBlock(parent, type, content);
+            const newBlock = convertedBlock(parent, type, content, start);
             if (!newBlock) return;
             parent.replaceWith(newBlock);
             // Keep the caret after the text already typed (a plain focus() would put it at the start).
@@ -2884,12 +3164,19 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         titleEl.addEventListener('input', () => { const p = appState.pages.find(p => p.id === appState.activePageId); if(p) p.title = titleEl.innerText; renderSidebar(); triggerSave(); });
         window.loadContent = (jsonString) => { let data = null; try { if(jsonString) data = JSON.parse(jsonString); } catch(e){} initApp(data); };
         editor.addEventListener('paste', (e) => {
+            const blocks = e.clipboardData && notebookParsePastedBlocks(e.clipboardData.getData(NB_BLOCKS_MIME));
+            if (blocks) {
+                e.preventDefault();
+                notebookPasteBlocks(blocks, blockOf(e.target));
+                return;
+            }
             pushUndoSnapshot();
             const pastedHtml = e.clipboardData && e.clipboardData.getData('text/html');
             if (pastedHtml) {
                 e.preventDefault();
                 if (userHtmlWasFiltered(pastedHtml)) showNotebookSecurityNotice(pastedHtml);
                 document.execCommand('insertHTML', false, sanitizeUserHtml(pastedHtml));
+                notebookHydrateMath(blockOf(e.target));
             }
             setTimeout(triggerSave, 100);
         });
@@ -3004,7 +3291,9 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return Array.from(editor.children).indexOf(block);
         }
 
+        let nbBlockAnchor = -1, nbBlockFocus = -1;
         function updateBlockHighlight(startIdx, endIdx) {
+            nbBlockAnchor = startIdx; nbBlockFocus = endIdx;
             const lo = Math.min(startIdx, endIdx);
             const hi = Math.max(startIdx, endIdx);
             selectedBlocks.clear();
@@ -3023,6 +3312,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             Array.from(editor.children).forEach(b => b.classList.remove('block-selected'));
             selectedBlocks.clear();
             dragStartIdx = -1;
+            nbBlockAnchor = nbBlockFocus = -1;
             isDragSelecting = false;
             hideBlockToolbar();
         }
@@ -3132,6 +3422,212 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         document.addEventListener('mouseup', () => {
             if (!isDragSelecting) { dragStartIdx = -1; }
             isDragSelecting = false;
+        });
+
+
+        // --- Copy, cut and paste of selected blocks; selecting blocks with the keyboard ---
+        // Blocks are separate editable fields, so the browser cannot select across them. Selected blocks
+        // are copied as plain text and HTML for other apps, and as block data (types, indent, numbering…)
+        // so that pasting back into the notebook recreates the blocks.
+        const NB_BLOCKS_MIME = 'application/x-synapse-blocks';
+        const NB_BLOCK_FIELDS = ['type', 'html', 'body', 'checked', 'open', 'indent', 'start', 'latex', 'tableOptions'];
+        const NB_BLOCK_TYPES = ['text', 'h1', 'h2', 'h3', 'bullet', 'numbered', 'todo', 'quote', 'callout', 'code', 'toggle', 'table', 'divider', 'latex'];
+        const NB_MAX_PASTE_BLOCKS = 500;
+
+        function notebookSelectedBlockData() {
+            saveCurrentEditorToState();
+            const page = appState.pages.find(p => p.id === appState.activePageId);
+            if (!page) return [];
+            return [...selectedBlocks].sort((a, b) => a - b).map(i => page.blocks[i]).filter(Boolean).map(block => {
+                const copy = {};
+                NB_BLOCK_FIELDS.forEach(key => { if (block[key] !== undefined) copy[key] = JSON.parse(JSON.stringify(block[key])); });
+                return copy;
+            });
+        }
+        function notebookHtmlToText(html) {
+            const holder = document.createElement('div');
+            holder.innerHTML = notebookMathToDelimiters(sanitizeUserHtml(html || ''));
+            holder.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+            holder.querySelectorAll('div,p,li').forEach(el => el.before('\n'));
+            return holder.textContent.replace(/\u00a0/g, ' ').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
+        }
+        function notebookBlocksToPlain(list) {
+            const counters = [0, 0, 0, 0, 0, 0];
+            return list.map(block => {
+                const level = Math.min(5, Math.max(0, parseInt(block.indent, 10) || 0)), pad = '  '.repeat(level);
+                const text = notebookHtmlToText(block.html);
+                if (['bullet', 'numbered', 'todo'].includes(block.type)) {
+                    for (let k = level + 1; k < 6; k++) counters[k] = 0;
+                    if (block.type === 'numbered') {
+                        counters[level] = counters[level] ? counters[level] + 1 : (parseInt(block.start, 10) || 1);
+                        return pad + counters[level] + '. ' + text.replace(/\n/g, ' ');
+                    }
+                    return pad + (block.type === 'todo' ? (block.checked ? '[x] ' : '[ ] ') : '- ') + text.replace(/\n/g, ' ');
+                }
+                counters.fill(0);
+                switch (block.type) {
+                    case 'h1': return '# ' + text;
+                    case 'h2': return '## ' + text;
+                    case 'h3': return '### ' + text;
+                    case 'quote': return text.split('\n').map(line => '> ' + line).join('\n');
+                    case 'divider': return '---';
+                    case 'latex': return '\\[ ' + String(block.latex || '').trim() + ' \\]';
+                    case 'toggle': return text + (block.body ? '\n' + notebookHtmlToText(block.body) : '');
+                    case 'table': {
+                        const holder = document.createElement('table'); holder.innerHTML = sanitizeUserHtml(block.html || '');
+                        return Array.from(holder.rows).map(row => Array.from(row.cells).map(cell => cell.textContent.trim()).join('\t')).join('\n');
+                    }
+                    default: return text;
+                }
+            }).join('\n');
+        }
+        function notebookBlocksToHtml(list) {
+            const esc = value => escHtml(String(value || ''));
+            let out = '', open = '';
+            const closeList = () => { if (open) { out += '</' + open + '>'; open = ''; } };
+            list.forEach(block => {
+                const html = notebookMathToDelimiters(sanitizeUserHtml(block.html || ''));
+                const listTag = block.type === 'numbered' ? 'ol' : ['bullet', 'todo'].includes(block.type) ? 'ul' : '';
+                if (listTag) {
+                    if (open !== listTag) { closeList(); out += '<' + listTag + '>'; open = listTag; }
+                    out += '<li>' + (block.type === 'todo' ? (block.checked ? '☑ ' : '☐ ') : '') + html + '</li>';
+                    return;
+                }
+                closeList();
+                if (/^h[123]$/.test(block.type)) out += '<' + block.type + '>' + html + '</' + block.type + '>';
+                else if (block.type === 'quote') out += '<blockquote>' + html + '</blockquote>';
+                else if (block.type === 'code') out += '<pre>' + html + '</pre>';
+                else if (block.type === 'divider') out += '<hr>';
+                else if (block.type === 'latex') out += '<p>\\[ ' + esc(block.latex) + ' \\]</p>';
+                else if (block.type === 'table') out += '<table>' + html + '</table>';
+                else if (block.type === 'toggle') out += '<p><b>' + html + '</b></p>' + (block.body ? '<div>' + notebookMathToDelimiters(sanitizeUserHtml(block.body)) + '</div>' : '');
+                else out += '<p>' + html + '</p>';
+            });
+            closeList();
+            return out;
+        }
+        function notebookWriteBlocksToClipboard(clipboardData) {
+            const list = notebookSelectedBlockData();
+            if (!list.length) return false;
+            clipboardData.setData('text/plain', notebookBlocksToPlain(list));
+            clipboardData.setData('text/html', notebookBlocksToHtml(list));
+            clipboardData.setData(NB_BLOCKS_MIME, JSON.stringify({ version: 1, blocks: list }));
+            return true;
+        }
+        // Pasted block data is untrusted: known types and fields only, sensible sizes, no stable ids.
+        function notebookParsePastedBlocks(raw) {
+            let data;
+            try { data = JSON.parse(raw); } catch (_) { return null; }
+            const list = data && Array.isArray(data.blocks) ? data.blocks.slice(0, NB_MAX_PASTE_BLOCKS) : null;
+            if (!list || !list.length) return null;
+            return list.filter(item => item && typeof item === 'object' && !Array.isArray(item)).map(item => {
+                const clean = { type: NB_BLOCK_TYPES.includes(item.type) ? item.type : 'text' };
+                ['html', 'body'].forEach(key => { if (typeof item[key] === 'string') clean[key] = sanitizeUserHtml(item[key].slice(0, 2000000)); });
+                if (typeof item.latex === 'string') clean.latex = item.latex.slice(0, 12000);
+                if (typeof item.html !== 'string') clean.html = '';
+                ['checked', 'open'].forEach(key => { if (typeof item[key] === 'boolean') clean[key] = item[key]; });
+                if (['bullet', 'numbered', 'todo'].includes(clean.type) && Number.isInteger(item.indent) && item.indent > 0) clean.indent = Math.min(NOTEBOOK_MAX_INDENT, item.indent);
+                if (clean.type === 'numbered' && Number.isInteger(item.start) && item.start > 0) clean.start = Math.min(9999, item.start);
+                if (item.tableOptions && typeof item.tableOptions === 'object' && !Array.isArray(item.tableOptions)) clean.tableOptions = item.tableOptions;
+                return clean;
+            });
+        }
+        function notebookPasteBlocks(list, anchor) {
+            if (!list.length) return false;
+            pushUndoSnapshot();
+            const fresh = list.map(data => createStoredBlock(data));
+            const emptyText = anchor && anchor.classList.contains('block') && !anchor.classList.contains('bullet') && !anchor.classList.contains('numbered')
+                && anchor.contentEditable === 'true' && !anchor.innerText.trim() && !anchor.querySelector('img');
+            let after = anchor || editor.lastElementChild;
+            fresh.forEach(block => { if (after) after.after(block); else editor.appendChild(block); after = block; });
+            if (emptyText && anchor.parentNode) anchor.remove();
+            clearBlockSelection();
+            const last = fresh[fresh.length - 1], field = notebookEditable(last);
+            if (field && field.contentEditable === 'true') setCaretEnd(field);
+            triggerSave();
+            return true;
+        }
+        function notebookClipboardTargetIsTextField() {
+            const active = document.activeElement;
+            return !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+        }
+        document.addEventListener('copy', e => {
+            if (!selectedBlocks.size || notebookClipboardTargetIsTextField() || !e.clipboardData) return;
+            if (notebookWriteBlocksToClipboard(e.clipboardData)) e.preventDefault();
+        });
+        document.addEventListener('cut', e => {
+            if (!selectedBlocks.size || notebookClipboardTargetIsTextField() || !e.clipboardData) return;
+            if (notebookWriteBlocksToClipboard(e.clipboardData)) { e.preventDefault(); deleteSelectedBlocks(); }
+        });
+        // Pasting while blocks are selected (focus is not in a field): insert after the selection.
+        document.addEventListener('paste', e => {
+            if (!selectedBlocks.size || editor.contains(e.target) || notebookClipboardTargetIsTextField() || !e.clipboardData) return;
+            const list = notebookParsePastedBlocks(e.clipboardData.getData(NB_BLOCKS_MIME));
+            if (!list) return;
+            e.preventDefault();
+            const last = editor.children[Math.max(...selectedBlocks)];
+            notebookPasteBlocks(list, last);
+        });
+
+        // Keyboard block selection: Ctrl/Cmd+A a second time selects all blocks, Shift+Up/Down at the edge of a
+        // block starts (and then extends) a block selection.
+        function notebookFocusAtEdge(field, atEnd) {
+            const sel = window.getSelection();
+            if (!field || !sel.rangeCount || !sel.focusNode || !field.contains(sel.focusNode)) return false;
+            const probe = document.createRange(); probe.selectNodeContents(field);
+            if (atEnd) probe.setStart(sel.focusNode, sel.focusOffset); else probe.setEnd(sel.focusNode, sel.focusOffset);
+            const fragment = probe.cloneContents();
+            return !fragment.textContent && !fragment.querySelector('img,svg,video,audio,iframe,object,table,input,.math-inline,.page-link');
+        }
+        function notebookExtendBlockSelection(delta) {
+            const last = editor.children.length - 1;
+            const focus = Math.min(last, Math.max(0, nbBlockFocus + delta));
+            updateBlockHighlight(nbBlockAnchor, focus);
+            editor.children[focus]?.scrollIntoView({ block: 'nearest' });
+        }
+        // Runs before the focused block's own handler, which would otherwise insert a block on Escape or
+        // merge/delete a block on Backspace while a block selection is active.
+        document.addEventListener('keydown', e => {
+            if (!selectedBlocks.size || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || notebookClipboardTargetIsTextField()) return;
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); clearBlockSelection(); }
+            else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); e.stopPropagation(); deleteSelectedBlocks(); }
+        }, true);
+        document.addEventListener('keydown', e => {
+            if (e.defaultPrevented || e.isComposing) return;
+            const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
+            if (selectedBlocks.size) {
+                if (e.shiftKey && !mod && !e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                    e.preventDefault(); notebookExtendBlockSelection(e.key === 'ArrowDown' ? 1 : -1); return;
+                }
+                if (mod && !e.altKey && key === 'a' && !notebookClipboardTargetIsTextField()) {
+                    e.preventDefault(); updateBlockHighlight(0, editor.children.length - 1); return;
+                }
+                const passive = ['Shift', 'Control', 'Meta', 'Alt', 'Escape', 'Delete', 'Backspace', 'Tab', 'CapsLock'];
+                if (passive.includes(e.key) || (mod && ['c', 'x', 'v', 'z', 'y', 'f', 's'].includes(key))) return;
+                // Typing or moving the caret ends the block selection and goes on as usual.
+                clearBlockSelection();
+                return;
+            }
+            if (!editor.contains(e.target) || !e.target.isContentEditable || notebookClipboardTargetIsTextField()) return;
+            const field = e.target.closest('[contenteditable="true"]');
+            if (mod && !e.altKey && !e.shiftKey && key === 'a') {
+                const selection = window.getSelection(), text = field.innerText.trim();
+                if (!text || (selection.rangeCount && selection.toString().trim() === text)) {
+                    const index = getBlockIndex(e.target);
+                    e.preventDefault(); selection.removeAllRanges();
+                    updateBlockHighlight(index, index);
+                    if (editor.children.length > 1) updateBlockHighlight(0, editor.children.length - 1);
+                }
+                return;
+            }
+            if (e.shiftKey && !mod && !e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                const down = e.key === 'ArrowDown', index = getBlockIndex(e.target), neighbour = editor.children[index + (down ? 1 : -1)];
+                if (neighbour && notebookFocusAtEdge(field, down)) {
+                    e.preventDefault(); window.getSelection().removeAllRanges();
+                    updateBlockHighlight(index, index + (down ? 1 : -1));
+                    neighbour.scrollIntoView({ block: 'nearest' });
+                }
+            }
         });
 
         window.onload = () => {
@@ -3864,6 +4360,13 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         // Colors are inline <span style> wrappers around the selected words. The selection is split per
         // editable field (blocks are separate contenteditables) and any earlier color of the same kind
         // inside it is removed first, so "Default" really clears it and repeated recoloring never nests.
+        const NOTEBOOK_COLORS = [
+                ['default_color','Default','inherit','transparent'], ['gray','Gray','#787774','#e9e9e7'],
+                ['brown','Brown','#9f6b53','#eee0da'], ['orange','Orange','#d9730d','#fae3cb'],
+                ['yellow','Yellow','#b58a00','#fff0b3'], ['green','Green','#0f7b6c','#d9eee4'],
+                ['blue','Blue','#0b6e99','#d9eafa'], ['purple','Purple','#6940a5','#e9dff4'],
+                ['pink','Pink','#ad3973','#f5ddeb'], ['red','Red','#c53d3d','#f9dcdc']
+        ];
         function notebookColorRanges(range) {
             const hosts = Array.from(editor.querySelectorAll('[contenteditable="true"]')).filter(host => range.intersectsNode(host) && !host.querySelector('[contenteditable="true"]'));
             return hosts.map(host => {
@@ -3901,6 +4404,92 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             } else range.insertNode(fragment);
             host.querySelectorAll('span[style]:empty').forEach(el => el.remove());
         }
+        // The last color picked for a selection is what the highlight button and shortcut use
+        // (yellow background until something was picked). Stored with the notebook, not part of undo history.
+        function notebookHighlightChoice() {
+            const saved = appState.highlightColor;
+            const property = saved && saved.property === 'color' ? 'color' : 'background-color';
+            const color = (saved && NOTEBOOK_COLORS.find(entry => entry[0] === saved.key && entry[0] !== 'default_color'))
+                || NOTEBOOK_COLORS.find(entry => entry[0] === 'yellow');
+            return { property, color, value: property === 'color' ? color[2] : color[3] };
+        }
+        function notebookRememberHighlight(property, key) {
+            if (appState.highlightColor && appState.highlightColor.property === property && appState.highlightColor.key === key) return;
+            appState.highlightColor = { property, key };
+            notebookUpdateHighlightButton();
+        }
+        function notebookUpdateHighlightButton() {
+            const button = document.getElementById('nb-highlight-btn');
+            if (!button) return;
+            const { property, value, color } = notebookHighlightChoice();
+            const swatch = button.querySelector('.nb-hl-swatch');
+            if (swatch) swatch.style.background = property === 'color' ? value : value;
+            const label = notebookShortcuts.highlightLabel || notebookShortcuts.highlight;
+            button.title = i18nGet('highlight_selection', 'Highlight with the last color') + ' – ' + i18nGet(color[0], color[1]) + (label ? ' (' + label + ')' : '');
+        }
+        function notebookRangeHasColor(range, property, wanted) {
+            const root = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode;
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            let any = false;
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (!node.textContent.trim() || !range.intersectsNode(node)) continue;
+                if ((node === range.startContainer && range.startOffset >= node.length) || (node === range.endContainer && range.endOffset === 0)) continue;
+                const span = node.parentElement && node.parentElement.closest('span[style]');
+                if (!span || span.style.getPropertyValue(property) !== wanted) return false;
+                any = true;
+            }
+            return any;
+        }
+        // Colors the selected words with the last picked color; pressing it again on text that already has
+        // exactly that color removes it.
+        function notebookHighlightSelection() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount || selection.isCollapsed || !editor.contains(selection.anchorNode)) return false;
+            const { property, value } = notebookHighlightChoice();
+            const ranges = notebookColorRanges(selection.getRangeAt(0));
+            if (!ranges.length) return false;
+            const probe = document.createElement('span'); probe.style.setProperty(property, value);
+            const wanted = probe.style.getPropertyValue(property);
+            const remove = ranges.every(range => notebookRangeHasColor(range, property, wanted));
+            pushUndoSnapshot();
+            ranges.forEach(range => notebookApplyColor(range, property, remove ? '' : value));
+            const joined = document.createRange();
+            joined.setStart(ranges[0].startContainer, ranges[0].startOffset);
+            joined.setEnd(ranges[ranges.length - 1].endContainer, ranges[ranges.length - 1].endOffset);
+            selection.removeAllRanges(); selection.addRange(joined);
+            triggerSave();
+            return true;
+        }
+        // Configurable shortcut (Qt portable text such as "Ctrl+Shift+H"; "Ctrl" is Cmd on macOS).
+        const notebookShortcuts = Object.assign({ highlight: 'Ctrl+Shift+H', highlightLabel: '' }, window.__SYNAPSE_NOTEBOOK_SHORTCUTS__ || {});
+        window.synapseSetNotebookShortcuts = cfg => {
+            if (!cfg || typeof cfg !== 'object') return;
+            if (typeof cfg.highlight === 'string') notebookShortcuts.highlight = cfg.highlight;
+            if (typeof cfg.highlightLabel === 'string') notebookShortcuts.highlightLabel = cfg.highlightLabel;
+            notebookUpdateHighlightButton();
+        };
+        const NOTEBOOK_KEY_NAMES = { ' ': 'space', Enter: 'return', Delete: 'del', Insert: 'ins', Escape: 'esc', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', PageUp: 'pgup', PageDown: 'pgdown', Backspace: 'backspace', Tab: 'tab', Home: 'home', End: 'end' };
+        function notebookKeyName(e) {
+            if (e.key && e.key.length === 1 && /[a-z0-9]/i.test(e.key)) return e.key.toLowerCase();
+            if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3).toLowerCase();
+            if (/^Digit\d$/.test(e.code)) return e.code.slice(5);
+            return (NOTEBOOK_KEY_NAMES[e.key] || String(e.key || '')).toLowerCase();
+        }
+        function notebookShortcutMatches(spec, e) {
+            const parts = String(spec || '').split('+').map(part => part.trim()).filter(Boolean);
+            if (!parts.length) return false;
+            const key = parts.pop().toLowerCase(), mods = new Set(parts), mac = /Mac|iPhone|iPad/.test(navigator.platform);
+            if (mods.has('Ctrl') !== (mac ? e.metaKey : e.ctrlKey) || mods.has('Meta') !== (mac ? e.ctrlKey : e.metaKey)) return false;
+            if (mods.has('Alt') !== e.altKey || mods.has('Shift') !== e.shiftKey) return false;
+            return notebookKeyName(e) === key;
+        }
+        document.addEventListener('keydown', e => {
+            if (e.defaultPrevented || e.isComposing || !notebookShortcuts.highlight) return;
+            if (!notebookShortcutMatches(notebookShortcuts.highlight, e)) return;
+            if (!editor.contains(e.target) || !e.target.isContentEditable) return;
+            if (notebookHighlightSelection()) e.preventDefault();
+        });
         function openNotebookColors(anchorElement, wholeBlock) {
             const anchor = anchorElement.getBoundingClientRect();
             const selection = window.getSelection();
@@ -3909,13 +4498,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 notebookRange = selection.getRangeAt(0).cloneRange();
             }
             notebookPopup.replaceChildren();
-            const colors = [
-                ['default_color','Default','inherit','transparent'], ['gray','Gray','#787774','#e9e9e7'],
-                ['brown','Brown','#9f6b53','#eee0da'], ['orange','Orange','#d9730d','#fae3cb'],
-                ['yellow','Yellow','#b58a00','#fff0b3'], ['green','Green','#0f7b6c','#d9eee4'],
-                ['blue','Blue','#0b6e99','#d9eafa'], ['purple','Purple','#6940a5','#e9dff4'],
-                ['pink','Pink','#ad3973','#f5ddeb'], ['red','Red','#c53d3d','#f9dcdc']
-            ];
+            const colors = NOTEBOOK_COLORS;
             for (const [key, fallback, command, column] of [
                 ['text_color','Text color','foreColor',2], ['background_color','Background','hiliteColor',3]
             ]) {
@@ -3934,6 +4517,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                             editables.forEach(el => { const range = document.createRange(); range.selectNodeContents(el); ranges.push(range); });
                         } else ranges = notebookColorRanges(notebookRange);
                         ranges.forEach(range => notebookApplyColor(range, property, value));
+                        if (color[0] !== 'default_color') notebookRememberHighlight(property, color[0]);
                         if (!wholeBlock && ranges.length) {
                             // Keep the words selected so another color can be applied right away.
                             const joined = document.createRange();
@@ -4422,7 +5006,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             if (pending) return;
             const selection = getSelection();
             if (!selection || selection.isCollapsed || !editor.contains(selection.anchorNode)) { status(tx('nbc_select_text_first', 'Select some text in your notes first.'), true); nbcOpen(side); return; }
-            const text = selection.toString().replace(/­/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+            const text = notebookRangeToText(selection.getRangeAt(0)).replace(/­/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
             if (!text) return;
             const s = session(), target = side === 'back' ? 'back' : 'front', previous = s.draft[target].trim();
             s.draft[target] = (previous ? previous + '\n' + text : text).slice(0, MAX_TEXT);

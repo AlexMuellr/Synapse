@@ -146,6 +146,7 @@ def get_default_settings() -> Dict[str, Any]:
         "stats_show_retention": True,
         "stats_show_new_cards": True,
         "sidebar_shortcuts": {},
+        "notebook_highlight_shortcut": constants.NOTEBOOK_HIGHLIGHT_DEFAULT,
         "language": "auto",  # UI language: "auto", "en", "de", "es"
         "active_color_theme": "ocean",   # Colour theme: "ocean","orchid","forest","deluge","horizon","dusty","custom"
         "custom_theme_colors": {},       # Used when active_color_theme == "custom"
@@ -638,6 +639,11 @@ def _apply_saved_settings(new_settings):
         sidebar_shortcuts.refresh(addon_settings)
     except Exception as e:
         print(f"SynapsePro: shortcut refresh failed: {e}")
+    try:
+        from . import notebook_sidebar
+        notebook_sidebar.refresh_notebook_shortcuts()
+    except Exception as e:
+        print(f"SynapsePro: notebook shortcut refresh failed: {e}")
 
     # Regenerate the custom solid background CSS if it is (still) selected,
     # so colour changes take effect on the next webview render.

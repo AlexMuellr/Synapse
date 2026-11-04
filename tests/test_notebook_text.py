@@ -24,6 +24,28 @@ class NotebookTextTests(unittest.TestCase):
         self.assertEqual(text.split('\n'), [
             '1. One', '  a. Sub', '  b. Sub 2', '2. Two', '  - Dot', '- [x] Task', 'break', '1. Again'])
 
+    def test_numbered_lists_can_start_anywhere(self):
+        text = nt.blocks_to_text([
+            {'type': 'numbered', 'html': 'a', 'start': 3},
+            {'type': 'numbered', 'html': 'b'},
+            {'type': 'numbered', 'html': 'c', 'indent': 1, 'start': 2},
+            {'type': 'numbered', 'html': 'd', 'indent': 1},
+            {'type': 'numbered', 'html': 'e', 'start': True},
+            {'type': 'text', 'html': 'x'},
+            {'type': 'numbered', 'html': 'f', 'start': 'oops'},
+        ])
+        self.assertEqual(text.split('\n'), ['3. a', '4. b', '  b. c', '  c. d', '5. e', 'x', '1. f'])
+
+    def test_inline_formulas_become_anki_delimiters(self):
+        formula = '<span class="math-inline" data-latex="%s"></span>'
+        text = nt.blocks_to_text([
+            {'type': 'text', 'html': 'Energy ' + formula % 'E=mc^2' + ' and ' + formula % r'\frac{1}{2}' + ' done'},
+            {'type': 'bullet', 'html': formula % 'x'},
+            {'type': 'text', 'html': '<span class="math-inline" data-latex="y"><span class="katex">rendered <b>junk</b></span></span> after'},
+            {'type': 'text', 'html': '<span class="other">kept</span> ' + formula % 'z' + '<br>next'},
+        ])
+        self.assertEqual(text.split('\n'), ['Energy \\(E=mc^2\\) and \\(\\frac{1}{2}\\) done', '- \\(x\\)', '\\(y\\) after', 'kept \\(z\\)', 'next'])
+
     def test_formatting_is_dropped_but_text_and_links_kept(self):
         text = nt.blocks_to_text([
             {'type': 'text', 'html': 'a <span style="color: rgb(1, 2, 3);">red</span> <b>bold</b>&nbsp;<a href="https://x.org">link</a><br>next'},

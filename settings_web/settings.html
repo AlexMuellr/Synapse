@@ -638,6 +638,8 @@
           <h1 class="page-title">Sidebar</h1>
           <p class="page-sub">Tools available in the launcher bar on the side of Anki.</p>
           <div class="group" id="sideGroup"></div>
+          <div class="group-label">Notebook</div>
+          <div class="group" id="notebookShortcutGroup"></div>
           <p class="rd" style="margin:12px 4px 0;">Shortcuts apply immediately after saving. Restart Anki after enabling or disabling sidebar tools.</p>
         </section>
 
@@ -794,6 +796,18 @@
     });
     var note = document.getElementById('dashboardLockNote');
     if(note) note.classList.toggle('visible', locked);
+  }
+
+  // The notebook's own shortcut (handled by the notebook page, not a global Anki shortcut).
+  function renderNotebookShortcut(){
+    var group = document.getElementById('notebookShortcutGroup');
+    if(!group) return;
+    var key = 'notebook_highlight';
+    var shortcut = _shortcutDisplays[key] || _shortcutValues[key] || '';
+    group.innerHTML = '<div class="row" data-setting-key="'+key+'"><div class="rl"><div class="rt">'+esc(tr('Highlight selected text'))+'</div>'+
+      '<div class="rd">'+esc(tr('Colors the selected words with the last color you picked in the notebook. Press it again to remove the color.'))+'</div></div>'+
+      '<div class="rc side-controls"><button type="button" class="shortcut-btn'+(shortcut?' set':'')+'" data-shortcut-key="'+key+'" title="'+esc(tr('Set keyboard shortcut'))+'">'+esc(shortcut || tr('Add Shortcut'))+'</button></div></div>';
+    group.querySelector('.shortcut-btn').addEventListener('click', function(){ bridge('editShortcut', key); });
   }
 
   window.setSidebarShortcut = function(data){
@@ -1160,6 +1174,7 @@
       renderToggles('deckGroup', DECK, cfg);
       renderDeckOverviewSettings(data.deckOverview);
       renderToggles('sideGroup', SIDE, cfg, true);
+      renderNotebookShortcut();
       var minimalToggle = document.querySelector('input[data-key="minimal_dashboard_enabled"]');
       if(minimalToggle) minimalToggle.addEventListener('change', syncMinimalDashboardControls);
       syncMinimalDashboardControls();

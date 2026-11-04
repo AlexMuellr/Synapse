@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import unittest.mock
 import pathlib
 import shutil
 import subprocess
@@ -39,6 +40,8 @@ class FakeIO:
         self.state_file = os.path.join(base, name + '-state.json')
         self.notebook = json.dumps({'activePageId': '', 'pages': []})
         self.todos = '[]'
+        self.pdfs = json.dumps({'version': 4, 'folders': [], 'pdfs': [], 'recentDecks': [], 'cardCreatorSession': None})
+        self.store = os.path.join(base, name + '-pdf-store')
         self.fail_write = False
         self.fail_flush = False
         self.flushes = self.reloads = 0
@@ -49,6 +52,8 @@ class FakeIO:
     def state_path(self): return self.state_file
     def read_notebook(self): return self.notebook
     def read_todos(self): return self.todos
+    def read_pdfs(self): return self.pdfs
+    def pdf_store_dir(self): return self.store
 
     def write_notebook(self, body):
         if self.fail_write:
@@ -60,6 +65,12 @@ class FakeIO:
         if self.fail_write:
             return False
         self.todos = body
+        return True
+
+    def write_pdfs(self, body):
+        if self.fail_write:
+            return False
+        self.pdfs = body
         return True
 
     def flush(self, callback):
@@ -211,6 +222,109 @@ class ServiceTests(unittest.TestCase):
         other.controller.save_config({'sync_first': 'remote'})
         other.run('sync')
         self.assertEqual(other.pages(), {'a': 'x'}, 'first sync can prefer the remote version')
+
+    def make_pdf(self, computer, name, content=b'%PDF-1.4 synthetic'):
+        path = os.path.join(computer.io.store + '-own', name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        pathlib.Path(path).write_bytes(content)
+        return path
+
+    def pdf_library(self, computer):
+        return json.loads(computer.io.pdfs)
+
+    def test_pdfs_are_off_by_default_and_never_touched(self):
+        self.assertFalse(self.pc.controller.config()['sync_pdfs'])
+        path = self.make_pdf(self.pc, 'a.pdf')
+        self.pc.io.pdfs = json.dumps({'version': 4, 'folders': [], 'pdfs': [{'id': 'p1', 'name': 'a.pdf', 'path': path, 'folderId': None}]})
+        self.pc.set_pages([page('a')])
+        self.pc.run('sync')
+        self.assertFalse(os.path.exists(os.path.join(self.pc.folder, 'pdfs')), 'nothing about PDFs is exported unless enabled')
+        self.assertIsNone(self.pc.controller.status()['local']['pdfs'], 'and they do not count as pending changes')
+
+    def test_pdf_library_with_folders_and_files_reaches_the_other_computer(self):
+        for computer in (self.pc, self.laptop):
+            computer.controller.save_config({'sync_pdfs': True})
+        a, b = self.make_pdf(self.pc, 'a.pdf', b'%PDF-A'), self.make_pdf(self.pc, 'b.pdf', b'%PDF-B')
+        self.pc.io.pdfs = json.dumps({'version': 4, 'recentDecks': ['X'], 'cardCreatorSession': {'pdfPath': a}, 'folders': [{'id': 'f1', 'name': 'Anatomy'}],
+                                      'pdfs': [{'id': 'p1', 'name': 'a.pdf', 'path': a, 'addedAt': '2026-01-01', 'folderId': 'f1'},
+                                               {'id': 'p2', 'name': 'b.pdf', 'path': b, 'addedAt': '2026-01-02', 'folderId': None}]})
+        result = self.pc.run('sync')
+        self.assertTrue(result['ok'] and result['pushed'], result)
+        self.assertEqual(result['files'], 2)
+        exported = json.loads(pathlib.Path(self.pc.folder, 'pdfs', 'entries', 'p1.json').read_text())
+        self.assertNotIn('path', exported, 'a local path is never exported')
+        self.assertEqual(pathlib.Path(self.pc.folder, 'pdfs', 'files', 'p1.pdf').read_bytes(), b'%PDF-A')
+        got = self.laptop.run('sync')
+        self.assertTrue(got['changed']['pdfs'] and got['files'] == 2)
+        library = self.pdf_library(self.laptop)
+        self.assertEqual([f['name'] for f in library['folders']], ['Anatomy'])
+        by_id = {p['id']: p for p in library['pdfs']}
+        self.assertEqual(by_id['p1']['folderId'], 'f1', 'folder membership travels')
+        self.assertTrue(by_id['p1']['path'].startswith(self.laptop.io.store), 'the file is kept in this profile')
+        self.assertEqual(pathlib.Path(by_id['p2']['path']).read_bytes(), b'%PDF-B')
+        self.assertEqual(library['recentDecks'], [], 'local view state is not taken over')
+        self.assertIsNone(library['cardCreatorSession'])
+
+    def test_pdf_changes_moves_deletes_and_replaced_files_follow(self):
+        for computer in (self.pc, self.laptop):
+            computer.controller.save_config({'sync_pdfs': True})
+        a = self.make_pdf(self.pc, 'a.pdf', b'%PDF-1')
+        self.pc.io.pdfs = json.dumps({'version': 4, 'folders': [{'id': 'f1', 'name': 'F'}], 'pdfs': [{'id': 'p1', 'name': 'a.pdf', 'path': a, 'folderId': None}]})
+        self.pc.run('sync'); self.laptop.run('sync')
+        copy_path = self.pdf_library(self.laptop)['pdfs'][0]['path']
+        # moved into a folder on the laptop
+        library = self.pdf_library(self.laptop); library['pdfs'][0]['folderId'] = 'f1'; self.laptop.io.pdfs = json.dumps(library)
+        self.laptop.run('sync'); self.pc.run('sync')
+        self.assertEqual(self.pdf_library(self.pc)['pdfs'][0]['folderId'], 'f1')
+        self.assertEqual(self.pdf_library(self.pc)['pdfs'][0]['path'], a, 'the original file stays where it was')
+        # the PDF itself is replaced on the pc: the laptop's copy follows, the pc's own file is never overwritten
+        pathlib.Path(a).write_bytes(b'%PDF-2 longer')
+        self.pc.run('sync'); self.laptop.run('sync')
+        self.assertEqual(pathlib.Path(copy_path).read_bytes(), b'%PDF-2 longer')
+        # deleting the entry removes the shared file and the laptop's copy, but never the pc's own file
+        library = self.pdf_library(self.pc); library['pdfs'] = []; self.pc.io.pdfs = json.dumps(library)
+        self.pc.run('sync'); self.laptop.run('sync')
+        self.assertFalse(os.path.exists(os.path.join(self.pc.folder, 'pdfs', 'files', 'p1.pdf')))
+        self.assertFalse(os.path.exists(copy_path))
+        self.assertTrue(os.path.exists(a), "the user's own file is never deleted")
+        self.assertEqual(self.pdf_library(self.laptop)['pdfs'], [])
+
+    def test_large_pdfs_sync_as_entries_only_and_missing_files_are_reported(self):
+        for computer in (self.pc, self.laptop):
+            computer.controller.save_config({'sync_pdfs': True})
+        big = self.make_pdf(self.pc, 'big.pdf', b'x' * 2048)
+        self.pc.io.pdfs = json.dumps({'version': 4, 'folders': [], 'pdfs': [{'id': 'p1', 'name': 'big.pdf', 'path': big, 'folderId': None}]})
+        with unittest.mock.patch.object(ns, 'MAX_PDF_SYNC_BYTES', 1024):
+            result = self.pc.run('sync')
+        self.assertEqual(result['oversized'], ['big.pdf'])
+        self.assertFalse(os.path.exists(os.path.join(self.pc.folder, 'pdfs', 'files', 'p1.pdf')))
+        got = self.laptop.run('sync')
+        library = self.pdf_library(self.laptop)
+        self.assertEqual([p['name'] for p in library['pdfs']], ['big.pdf'], 'the library entry still arrives')
+        self.assertEqual(library['pdfs'][0]['path'], '', 'no file here: the library offers relink')
+        self.assertEqual(got['missing_files'], 1)
+
+    def test_pdf_status_and_red_tab_cover_the_library_when_enabled(self):
+        self.pc.controller.save_config({'sync_pdfs': True})
+        path = self.make_pdf(self.pc, 'a.pdf')
+        self.pc.io.pdfs = json.dumps({'version': 4, 'folders': [{'id': 'f1', 'name': 'F'}], 'pdfs': [{'id': 'p1', 'name': 'a.pdf', 'path': path, 'folderId': 'f1'}]})
+        local = self.pc.controller.status()['local']['pdfs']
+        self.assertEqual(sorted(x['title'] for x in local['added']), ['F', 'a.pdf'])
+        self.pc.run('sync')
+        self.assertEqual(self.pc.controller.status()['local']['pdfs'], {'added': [], 'modified': [], 'deleted': []})
+        self.pc.controller.refresh_status()
+        self.assertFalse(self.pc.controller.dirty)
+
+    def test_legacy_pdf_list_and_damaged_library_do_not_break_sync(self):
+        self.pc.controller.save_config({'sync_pdfs': True})
+        path = self.make_pdf(self.pc, 'a.pdf')
+        self.pc.io.pdfs = json.dumps([{'id': 'p1', 'name': 'a.pdf', 'path': path}])        # the oldest format: a plain list
+        self.assertTrue(self.pc.run('sync')['ok'])
+        self.assertTrue(os.path.exists(os.path.join(self.pc.folder, 'pdfs', 'entries', 'p1.json')), 'the old list format is exported too')
+        self.assertIsInstance(self.pdf_library(self.pc), list, 'and the local database is left as it was')
+        self.pc.io.pdfs = 'not json'
+        result = self.pc.run('sync')
+        self.assertEqual((result['ok'], result['error'][0]), (False, 'unsafe'))
 
     def test_settings_are_validated(self):
         controller = self.pc.controller

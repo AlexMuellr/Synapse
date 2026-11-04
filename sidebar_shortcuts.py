@@ -40,6 +40,7 @@ FEATURE_LABELS = {
     "ai_assistant_enabled": "AI Assistant",
     "website_viewer_enabled": "Website Viewer",
     "notebook_enabled": "Notebook",
+    "notebook_highlight": "Notebook: highlight text",
 }
 
 _registered: Dict[str, Any] = {}

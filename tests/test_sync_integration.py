@@ -124,6 +124,25 @@ class IntegrationTests(unittest.TestCase):
         tasks = json.loads(self.laptop.module.load_latest_todos(self.laptop.module.db_path()))
         self.assertEqual([t['text'] for t in tasks], ['milk'])
 
+    def test_pdf_library_through_the_real_database_and_profile_store(self):
+        for profile in (self.pc, self.laptop):
+            profile.settings['sync_pdfs'] = True
+        source = pathlib.Path(self.dir.name, 'lecture.pdf')
+        source.write_bytes(b'%PDF-1.4 synthetic')
+        library = {'version': 4, 'folders': [{'id': 'f1', 'name': 'Anatomy'}], 'recentDecks': [], 'cardCreatorSession': None,
+                   'pdfs': [{'id': 'p1', 'name': 'lecture.pdf', 'path': str(source), 'addedAt': '2026-01-01', 'folderId': 'f1'}]}
+        self.assertTrue(self.pc.module._save_snapshot('pdfs', json.dumps(library), self.pc.module.db_path()))
+        self.assertTrue(self.pc.run('sync')['ok'])
+        result = self.laptop.run('sync')
+        self.assertTrue(result['changed']['pdfs'], result)
+        received = json.loads(self.laptop.module.load_pdf_list(self.laptop.module.db_path()))
+        entry = received['pdfs'][0]
+        self.assertEqual(entry['folderId'], 'f1')
+        self.assertEqual(os.path.dirname(entry['path']), os.path.join(self.laptop.folder, 'SynapsePro_Data', 'synced_pdfs'))
+        self.assertEqual(pathlib.Path(entry['path']).read_bytes(), b'%PDF-1.4 synthetic')
+        enriched = json.loads(self.laptop.module.load_pdf_list_enriched(self.laptop.module.db_path()))
+        self.assertTrue(enriched['pdfs'][0]['_exists'], 'the PDF viewer finds the file')
+
     def test_settings_are_stored_in_the_profile_settings(self):
         controller = self.pc.module._get_sync_controller()
         controller.save_config({'sync_auto_push': True, 'sync_auto_pull': False})

@@ -247,6 +247,15 @@ if _QT_AVAILABLE:
                 )
                 if sidebar_shortcuts else {}
             )
+            # The notebook highlight shortcut lives next to, but separate from, the sidebar shortcuts.
+            self._highlight_value = ""
+            if sidebar_shortcuts:
+                raw = self.current_config.get(
+                    "notebook_highlight_shortcut", constants.NOTEBOOK_HIGHLIGHT_DEFAULT
+                )
+                portable = sidebar_shortcuts.normalise_sequence(raw)
+                if portable and sidebar_shortcuts.is_safe_sequence(portable):
+                    self._highlight_value = portable
             self._result: Optional[Dict] = None
             self._injected = False
             self._background_action: Optional[str] = None
@@ -317,6 +326,14 @@ if _QT_AVAILABLE:
             except Exception:
                 s["stats_time_range"] = 7
             if sidebar_shortcuts:
+                # The page sends one map; the notebook entry is stored under its own setting.
+                sent = s.get("sidebar_shortcuts", {})
+                highlight = sidebar_shortcuts.normalise_sequence(
+                    sent.get(constants.NOTEBOOK_HIGHLIGHT_KEY) if isinstance(sent, dict) else ""
+                )
+                s["notebook_highlight_shortcut"] = (
+                    highlight if highlight and sidebar_shortcuts.is_safe_sequence(highlight) else ""
+                )
                 s["sidebar_shortcuts"] = sidebar_shortcuts.normalise_shortcut_map(
                     s.get("sidebar_shortcuts", self._shortcut_values)
                 )
@@ -559,9 +576,10 @@ if _QT_AVAILABLE:
 
         def _edit_shortcut(self, feature_key: str):
             """Record one native Qt key chord and return it to the web UI."""
+            is_highlight = feature_key == constants.NOTEBOOK_HIGHLIGHT_KEY
             if (
                 not sidebar_shortcuts
-                or feature_key not in constants.SIDEBAR_SHORTCUT_KEYS
+                or (feature_key not in constants.SIDEBAR_SHORTCUT_KEYS and not is_highlight)
             ):
                 return
             try:
@@ -582,7 +600,7 @@ if _QT_AVAILABLE:
                     edit.setClearButtonEnabled(True)
                 except (AttributeError, TypeError):
                     pass
-                current = self._shortcut_values.get(feature_key, "")
+                current = self._highlight_value if is_highlight else self._shortcut_values.get(feature_key, "")
                 if current:
                     edit.setKeySequence(QKeySequence.fromString(
                         current, QKeySequence.SequenceFormat.PortableText
@@ -623,7 +641,10 @@ if _QT_AVAILABLE:
                     if raw and not sidebar_shortcuts.is_safe_sequence(raw):
                         error.setText(_("Use Ctrl, Alt, Command or a function key."))
                         return
-                    for other_key, other_value in self._shortcut_values.items():
+                    taken = dict(self._shortcut_values)
+                    if self._highlight_value:
+                        taken[constants.NOTEBOOK_HIGHLIGHT_KEY] = self._highlight_value
+                    for other_key, other_value in taken.items():
                         if other_key != feature_key and portable and other_value == portable:
                             other = _(sidebar_shortcuts.FEATURE_LABELS.get(other_key, "Sidebar"))
                             error.setText(
@@ -641,7 +662,9 @@ if _QT_AVAILABLE:
                         )
                         return
 
-                    if portable:
+                    if is_highlight:
+                        self._highlight_value = portable
+                    elif portable:
                         self._shortcut_values[feature_key] = portable
                     else:
                         self._shortcut_values.pop(feature_key, None)
@@ -662,6 +685,13 @@ if _QT_AVAILABLE:
                 dlg.exec()
             except Exception as e:
                 print(f"WebSettings: shortcut editor error: {e}")
+
+        def _shortcuts_for_page(self) -> Dict[str, str]:
+            """Sidebar shortcuts plus the notebook highlight entry, as the page shows and returns them."""
+            shortcuts = dict(self._shortcut_values)
+            if self._highlight_value:
+                shortcuts[constants.NOTEBOOK_HIGHLIGHT_KEY] = self._highlight_value
+            return shortcuts
 
         # -- payload helpers -------------------------------------------------
         def _is_night(self) -> bool:
@@ -789,7 +819,7 @@ if _QT_AVAILABLE:
                     else "dark"
                 ),
                 "deck_counter_colors_enabled": bool(cfg.get("deck_counter_colors_enabled", False)),
-                "sidebar_shortcuts": dict(self._shortcut_values),
+                "sidebar_shortcuts": self._shortcuts_for_page(),
             }
             for key, fallback in _COUNTER_COLOR_DEFAULTS.items():
                 conf[key] = _safe_counter_color(cfg.get(key), fallback)
@@ -820,7 +850,7 @@ if _QT_AVAILABLE:
                 "backgroundThemes": self._background_themes(),
                 "shortcutDisplays": {
                     key: sidebar_shortcuts.display_sequence(value)
-                    for key, value in self._shortcut_values.items()
+                    for key, value in self._shortcuts_for_page().items()
                 } if sidebar_shortcuts else dict(self._shortcut_values),
                 "changelog": self._changelog(),
                 "supporters": SUPPORTERS,

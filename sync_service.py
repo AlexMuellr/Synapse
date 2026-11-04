@@ -5,8 +5,9 @@ Everything that touches Anki or Qt comes in through the ``io`` object (see noteb
 
     io.get_setting(key, default) / io.set_settings({..})
     io.state_path()                      per-device state file (never synced)
-    io.read_notebook() / io.read_todos() current snapshot bodies from the database
-    io.write_notebook(body) / io.write_todos(body) -> bool   validated save path
+    io.read_notebook() / io.read_todos() / io.read_pdfs() current snapshot bodies from the database
+    io.write_notebook(body) / io.write_todos(body) / io.write_pdfs(body) -> bool   validated save path
+    io.pdf_store_dir()                   where PDFs that arrive from another computer are kept
     io.flush(callback)                   save the page that is open, then callback(bool)
     io.reload()                          show the new data in the open page
     io.run_bg(fn, callback)              run fn off the GUI thread, callback(result) on it
@@ -27,6 +28,7 @@ DEFAULTS: dict[str, Any] = {
     "sync_auto_push": False,
     "sync_notebook": True,
     "sync_todos": True,
+    "sync_pdfs": False,               # PDF files can be large: opt in, like pushing when Anki closes
     "sync_first": "merge",
 }
 KINDS = ("sync", "pull", "push")
@@ -74,7 +76,7 @@ class SyncController:
 
     def categories(self, cfg: Optional[dict] = None) -> tuple[str, ...]:
         cfg = cfg or self.config()
-        return tuple(name for name, key in (("notebook", "sync_notebook"), ("todos", "sync_todos")) if cfg[key])
+        return tuple(name for name, key in (("notebook", "sync_notebook"), ("todos", "sync_todos"), ("pdfs", "sync_pdfs")) if cfg[key])
 
     def state(self) -> dict:
         return notebook_sync.load_state(self.io.state_path())
@@ -86,12 +88,14 @@ class SyncController:
         return self._dirty
 
     def _local_part(self, cfg: dict, state: dict) -> dict:
-        local: dict[str, Any] = {"notebook": None, "todos": None}
+        local: dict[str, Any] = {"notebook": None, "todos": None, "pdfs": None}
         try:
             if cfg["sync_notebook"]:
                 local["notebook"] = notebook_sync.local_changes(self.io.read_notebook(), state)
             if cfg["sync_todos"]:
                 local["todos"] = notebook_sync.todo_changes(self.io.read_todos(), state)
+            if cfg["sync_pdfs"]:
+                local["pdfs"] = notebook_sync.pdf_changes(self.io.read_pdfs(), state)
         except Exception as exc:
             print(f"Synapse sync: could not read local changes: {exc}")
         return local
@@ -117,7 +121,7 @@ class SyncController:
             "local": local,
             "device": state.get("device", ""),
             "last_sync": state.get("last_sync", 0),
-            "first_sync": not state.get("base", {}).get("notebook") and not state.get("base", {}).get("todos"),
+            "first_sync": not any(state.get("base", {}).get(name) for name in ("notebook", "todos", "pdfs")),
             "busy": self.busy,
             "error": list(self.last_error) if self.last_error else None,
             "result": self.last_result,
@@ -170,8 +174,9 @@ class SyncController:
         bg = run_bg or self.io.run_bg
         cfg = self.config()
         result: dict[str, Any] = {"ok": False, "kind": kind, "pulled": False, "pushed": False,
-                                  "changed": {"notebook": False, "todos": False}, "conflicts": [],
-                                  "skipped": [], "error": None, "at": round(time.time())}
+                                  "changed": {"notebook": False, "todos": False, "pdfs": False}, "conflicts": [],
+                                  "skipped": [], "files": 0, "oversized": [], "missing_files": 0,
+                                  "error": None, "at": round(time.time())}
 
         def finish(error: Optional[tuple[str, str]] = None, ok: bool = False) -> None:
             self.busy = False
@@ -222,13 +227,15 @@ class SyncController:
                 finish(("flush", "Your open page could not be saved, so nothing was synced."))
                 return
             state = self.state()
-            first = not state.get("base", {}).get("notebook") and not state.get("base", {}).get("todos")
+            first = not any(state.get("base", {}).get(name) for name in ("notebook", "todos", "pdfs"))
             try:
                 merged = sync_manager.merge(
                     self.io.read_notebook() if "notebook" in self.categories(cfg) else None,
                     self.io.read_todos() if "todos" in self.categories(cfg) else None,
                     cfg["sync_folder"], state, self.categories(cfg),
-                    cfg["sync_first"] if first else "merge")
+                    cfg["sync_first"] if first else "merge",
+                    self.io.read_pdfs() if "pdfs" in self.categories(cfg) else None,
+                    self.io.pdf_store_dir() if "pdfs" in self.categories(cfg) else "")
             except notebook_sync.SyncError as exc:
                 finish(("unsafe", str(exc)))
                 return
@@ -236,7 +243,8 @@ class SyncController:
                 finish(("folder", str(exc)))
                 return
             for name, body, writer in (("notebook", merged["notebook"], self.io.write_notebook),
-                                       ("todos", merged["todos"], self.io.write_todos)):
+                                       ("todos", merged["todos"], self.io.write_todos),
+                                       ("pdfs", merged["pdfs"], self.io.write_pdfs)):
                 if body is not None:
                     if not writer(body):
                         # Nothing about this run is remembered, so the next one starts from the same base.
@@ -247,6 +255,9 @@ class SyncController:
             for name, report in merged["reports"].items():
                 result["conflicts"] += [[name, *entry] for entry in report["conflicts"]]
                 result["skipped"] += report["skipped"]
+                result["files"] += report.get("files_up", 0) + report.get("files_down", 0)
+                result["oversized"] += report.get("oversized", [])
+                result["missing_files"] += len(report.get("missing", []))
             if any(result["changed"].values()):
                 self.io.reload()
             if not cfg["sync_git"]:

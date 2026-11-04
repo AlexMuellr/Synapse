@@ -21,12 +21,14 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import time
 import uuid
 from typing import Any, Callable, Optional
 
 SYNC_VERSION = 1
 STRATEGIES = ("merge", "local", "remote")
+MAX_PDF_SYNC_BYTES = 50 * 1024 * 1024     # larger PDFs sync as library entries only
 NOTEBOOK_COLLECTIONS = ("pages", "folders", "templates")
 _TOP_KEY = {"pages": "pages", "folders": "folders", "templates": "notebookTemplates"}
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
@@ -387,3 +389,154 @@ def todo_changes(local_body: str, state: dict) -> dict:
                      if k in base and entry_hash(v) != base[k]],
         "deleted": [{"id": k, "title": ""} for k in base if k not in items],
     }
+
+
+# ── PDF library ───────────────────────────────────────────────────────────────
+# Entries and folders merge like pages. An entry's ``path`` only means something on its own
+# computer, so it is never exported; the PDF files themselves are copied next to the entries.
+
+_PDF_LOCAL_KEYS = ("path", "_exists")
+
+
+def _pdf_view(entry: Any) -> Any:
+    return {k: v for k, v in entry.items() if k not in _PDF_LOCAL_KEYS} if isinstance(entry, dict) else entry
+
+
+def _pdf_parts(body: Any) -> dict:
+    """The library as {"data": dict, "entries": {id: entry}, "folders": {id: folder}, extras…}."""
+    try:
+        data = json.loads(body)
+    except (TypeError, ValueError) as exc:
+        raise SyncError("The local PDF library is not valid JSON.") from exc
+    if isinstance(data, list):
+        data = {"version": 4, "folders": [], "pdfs": data}
+    if not isinstance(data, dict) or not isinstance(data.get("pdfs"), list):
+        raise SyncError("The local PDF library has an unexpected format.")
+    entries, extra_entries = _split(data["pdfs"])
+    folders, extra_folders = _split(data.get("folders"))
+    return {"data": data, "entries": entries, "folders": folders,
+            "extra_entries": extra_entries, "extra_folders": extra_folders}
+
+
+def _fingerprint(path: str) -> str:
+    info = os.stat(path)
+    return f"{info.st_size}-{info.st_mtime_ns}"
+
+
+def _copy_file(source: str, target: str) -> None:
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    tmp = target + ".tmp"
+    shutil.copyfile(source, tmp)
+    os.replace(tmp, target)
+
+
+def _inside(path: str, folder: str) -> bool:
+    try:
+        return os.path.commonpath([os.path.abspath(path), os.path.abspath(folder)]) == os.path.abspath(folder)
+    except ValueError:
+        return False
+
+
+def sync_pdfs(local_body: str, sync_dir: str, state: dict, store_dir: str,
+              strategy: str = "merge", now: Optional[float] = None,
+              max_bytes: Optional[int] = None) -> dict:
+    """Merge the PDF library (entries and folders) and copy the PDF files.
+
+    Own files are uploaded, never replaced. A file that only exists in the sync folder is copied
+    into ``store_dir`` (a copy this computer owns and may refresh); the entry then points there.
+    Returns {"body", "changed", "report"}; the report adds files_up, files_down, oversized, missing.
+    """
+    max_bytes = MAX_PDF_SYNC_BYTES if max_bytes is None else max_bytes
+    parts = _pdf_parts(local_body)
+    data = parts["data"]
+    local_paths = {k: str(v.get("path") or "") for k, v in parts["entries"].items()}
+    before = set(state.get("base", {}).get("pdfs", {}).get("entries", {}))
+    merged, report = _sync_collections(
+        {"entries": {k: _pdf_view(v) for k, v in parts["entries"].items()}, "folders": parts["folders"]},
+        sync_dir, "pdfs", state, strategy, now)
+    entries = merged["entries"]["entries"]
+    report.update({"files_up": 0, "files_down": 0, "oversized": [], "missing": []})
+
+    files_dir = os.path.join(sync_dir, "pdfs", "files")
+    paths_map = state.setdefault("pdf_paths", {})
+    uploaded = state.setdefault("pdf_up", {})
+    downloaded = state.setdefault("pdf_down", {})
+    final_paths: dict[str, str] = {}
+    unknown: list[str] = []            # entries whose file this computer does not have
+    for entry_id, entry in entries.items():
+        blob = os.path.join(files_dir, file_stem(entry_id) + ".pdf")
+        own = local_paths.get(entry_id, "")
+        managed = paths_map.get(entry_id, "")
+        title = str(entry.get("name") or entry_id) if isinstance(entry, dict) else entry_id
+        if own and os.path.isfile(own) and not _inside(own, store_dir):
+            final_paths[entry_id] = own
+            size = os.path.getsize(own)
+            if size > max_bytes:
+                report["oversized"].append(title)
+            elif not os.path.isfile(blob) or uploaded.get(entry_id) != _fingerprint(own):
+                _copy_file(own, blob)
+                uploaded[entry_id] = _fingerprint(own)
+                report["files_up"] += 1
+            continue
+        current = own if own and os.path.isfile(own) else managed
+        if current and os.path.isfile(current) and _inside(current, store_dir):
+            final_paths[entry_id] = current          # our own copy: refresh it when the remote file changed
+            if os.path.isfile(blob) and downloaded.get(entry_id) != _fingerprint(blob):
+                _copy_file(blob, current)
+                downloaded[entry_id] = _fingerprint(blob)
+                report["files_down"] += 1
+            continue
+        if os.path.isfile(blob):
+            target = os.path.join(store_dir, file_stem(entry_id) + ".pdf")
+            _copy_file(blob, target)
+            paths_map[entry_id] = target
+            downloaded[entry_id] = _fingerprint(blob)
+            final_paths[entry_id] = target
+            report["files_down"] += 1
+            continue
+        final_paths[entry_id] = own or managed       # file unknown here: the library offers "relink"
+        unknown.append(entry_id)
+
+    # A conflict copy of an entry is the same PDF: it shares the original's file.
+    for name, original_id, copy_id in report["conflicts"]:
+        if name == "entries" and copy_id in unknown and final_paths.get(original_id):
+            final_paths[copy_id] = final_paths[original_id]
+            unknown.remove(copy_id)
+    report["missing"] = [str(entries[k].get("name") or k) if isinstance(entries[k], dict) else k for k in unknown]
+
+    # Entries gone everywhere: remove the shared file and the copy this computer made of it.
+    for entry_id in before - set(entries):
+        blob = os.path.join(files_dir, file_stem(entry_id) + ".pdf")
+        if os.path.isfile(blob):
+            os.remove(blob)
+        copy_path = paths_map.pop(entry_id, "")
+        if copy_path and _inside(copy_path, store_dir) and os.path.isfile(copy_path):
+            os.remove(copy_path)
+        uploaded.pop(entry_id, None)
+        downloaded.pop(entry_id, None)
+
+    result = {key: value for key, value in data.items()}
+    result["version"] = data.get("version", 4)
+    result["pdfs"] = _ordered(data["pdfs"], {k: ({**v, "path": final_paths.get(k, "")} if isinstance(v, dict) else v)
+                                             for k, v in entries.items()}, parts["extra_entries"])
+    result["folders"] = _ordered(data.get("folders"), merged["folders"]["entries"], parts["extra_folders"])
+    body = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    original = {"version": 4, "folders": [], "pdfs": data["pdfs"]} if isinstance(json.loads(local_body), list) else data
+    return {"body": body, "changed": canonical(json.loads(body)) != canonical(original), "report": report}
+
+
+def pdf_changes(local_body: str, state: dict) -> dict:
+    """{added, modified, deleted} for the PDF library (entries and folders) since the last sync."""
+    try:
+        parts = _pdf_parts(local_body)
+    except SyncError:
+        return {"added": [], "modified": [], "deleted": []}
+    base = state.get("base", {}).get("pdfs", {})
+    out: dict[str, list] = {"added": [], "modified": [], "deleted": []}
+    for name, items in (("entries", {k: _pdf_view(v) for k, v in parts["entries"].items()}), ("folders", parts["folders"])):
+        known = base.get(name, {})
+        title = lambda item: str(item.get("name") or "") if isinstance(item, dict) else ""
+        out["added"] += [{"id": k, "title": title(v)} for k, v in items.items() if k not in known]
+        out["modified"] += [{"id": k, "title": title(v)} for k, v in items.items() if k in known and entry_hash(v) != known[k]]
+        out["deleted"] += [{"id": k, "title": ""} for k in known if k not in items]
+    return out

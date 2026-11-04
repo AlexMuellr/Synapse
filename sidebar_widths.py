@@ -2,13 +2,26 @@
 
 Qt's dock area can reuse the width of a different hidden dock. Restore each
 feature's own splitter choice on show/tool change, using a 400 px starting width
-until the user actually drags the main-window dock separator. Main-window
+(the notebook group opens at 40% of the window) until the user actually drags the
+main-window dock separator. Main-window
 resizes, floating windows and embedded/fullscreen tools do not teach widths.
 """
 from aqt.qt import QObject, QEvent, QTimer, Qt
 
 
 DEFAULT_SIDEBAR_WIDTH = 400
+
+# Share of the main window's width a group opens with until the user drags its separator.
+# The notebook is a writing surface and needs more room than the other tools.
+DEFAULT_WIDTH_FRACTION = {"notebook": 0.40}
+
+
+def default_width(group, window_width):
+    """Opening width for a group: its share of the window, never narrower than the shared default."""
+    fraction = DEFAULT_WIDTH_FRACTION.get(group)
+    if not fraction:
+        return DEFAULT_SIDEBAR_WIDTH
+    return max(DEFAULT_SIDEBAR_WIDTH, int(window_width * fraction))
 
 
 def width_group(feature):
@@ -59,7 +72,7 @@ class SidebarWidth(QObject):
     def restore(self):
         if not self.active():
             return
-        requested = self.widths.get(self.feature, DEFAULT_SIDEBAR_WIDTH)
+        requested = self.widths.get(self.feature) or default_width(self.feature, self.window.contentsRect().width())
         center = self.window.centralWidget()
         center_min = max(160, center.minimumWidth(), center.minimumSizeHint().width()) if center else 160
         available = max(self.dock.minimumWidth(), self.window.contentsRect().width() - center_min - 12)

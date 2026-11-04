@@ -85,9 +85,19 @@ class _TextExtractor(HTMLParser):
         self.images = images
         self.parts: list[str] = []
         self._skip = 0
+        self._math = 0        # >0 while inside an inline formula (its content is not text)
         self._links: list[str | None] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self._math:
+            if tag == "span":
+                self._math += 1
+            return
+        if tag == "span" and "math-inline" in (dict(attrs).get("class") or "").split():
+            # Inline formula: keep the LaTeX source in the delimiters Anki renders itself.
+            self.parts.append("\\(" + (dict(attrs).get("data-latex") or "") + "\\)")
+            self._math = 1
+            return
         if tag in ("script", "style"):
             self._skip += 1
         elif tag in _BLOCK_TAGS:
@@ -100,6 +110,10 @@ class _TextExtractor(HTMLParser):
             self.parts.append(" | ")
 
     def handle_endtag(self, tag: str) -> None:
+        if self._math:
+            if tag == "span":
+                self._math -= 1
+            return
         if tag in ("script", "style"):
             self._skip = max(0, self._skip - 1)
         elif tag == "a" and self._links:
@@ -108,7 +122,7 @@ class _TextExtractor(HTMLParser):
                 self.parts.append(f" ({href})")
 
     def handle_data(self, data: str) -> None:
-        if not self._skip:
+        if not self._skip and not self._math:
             self.parts.append(data)
 
 
@@ -179,7 +193,11 @@ def blocks_to_text(blocks: Iterable[Any], images: Optional[ImageCollector] = Non
                 counters[deeper] = 0
             text = html_to_text(html, images).replace("\n", " ")
             if kind == "numbered":
-                counters[level] += 1
+                start = block.get("start")
+                if isinstance(start, int) and not isinstance(start, bool) and start > 1:
+                    counters[level] = start      # the item starts at its own number
+                else:
+                    counters[level] += 1
                 lines.append(f"{pad}{_label(counters[level], level)}. {text}")
             elif kind == "todo":
                 lines.append(f"{pad}- [{'x' if block.get('checked') else ' '}] {text}")

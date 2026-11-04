@@ -19,7 +19,7 @@ from typing import Optional
 
 from . import notebook_sync, sync_git
 
-CATEGORIES = ("notebook", "todos")
+CATEGORIES = ("notebook", "todos", "pdfs")
 
 
 def git_ready(folder: str, use_git: bool) -> bool:
@@ -48,14 +48,17 @@ def merge(
     state: dict,
     categories: tuple[str, ...] = CATEGORIES,
     strategy: str = "merge",
+    pdfs_body: Optional[str] = None,
+    pdf_store: str = "",
 ) -> dict:
-    """Merge the snapshots with the folder and export. Returns {"state", "notebook", "todos", "reports"}.
+    """Merge the snapshots with the folder and export. Returns {"state", "notebook", "todos", "pdfs", "reports"}.
 
-    ``notebook``/``todos`` are new snapshot bodies, or None when unchanged or not selected.
+    ``notebook``/``todos``/``pdfs`` are new snapshot bodies, or None when unchanged or not selected.
+    ``pdf_store`` is where PDF files that arrive from another computer are kept.
     Raises notebook_sync.SyncError for problems that make syncing unsafe (nothing written).
     """
     state = copy.deepcopy(state)
-    out: dict = {"state": state, "notebook": None, "todos": None, "reports": {}}
+    out: dict = {"state": state, "notebook": None, "todos": None, "pdfs": None, "reports": {}}
     if "notebook" in categories and notebook_body is not None:
         result = notebook_sync.sync_notebook(notebook_body, folder, state, strategy)
         out["reports"]["notebook"] = result["report"]
@@ -64,6 +67,10 @@ def merge(
         result = notebook_sync.sync_todos(todos_body, folder, state, strategy)
         out["reports"]["todos"] = result["report"]
         out["todos"] = result["body"] if result["changed"] else None
+    if "pdfs" in categories and pdfs_body is not None and pdf_store:
+        result = notebook_sync.sync_pdfs(pdfs_body, folder, state, pdf_store, strategy)
+        out["reports"]["pdfs"] = result["report"]
+        out["pdfs"] = result["body"] if result["changed"] else None
     return out
 
 
@@ -94,14 +101,16 @@ def sync_once(
     use_git: bool = True,
     push: bool = True,
     strategy: str = "merge",
+    pdfs_body: Optional[str] = None,
+    pdf_store: str = "",
 ) -> dict:
-    """All phases in one call. Returns {"state", "notebook", "todos", "pulled", "pushed", "error", "reports"}."""
+    """All phases in one call. Returns {"state", "notebook", "todos", "pdfs", "pulled", "pushed", "error", "reports"}."""
     pulled = pull(folder, use_git)
-    merged = merge(notebook_body, todos_body, folder, state, categories, strategy)
+    merged = merge(notebook_body, todos_body, folder, state, categories, strategy, pdfs_body, pdf_store)
     error = pulled["error"]
     published = publish(folder, use_git, push and error is None)
     return {
-        "state": merged["state"], "notebook": merged["notebook"], "todos": merged["todos"],
+        "state": merged["state"], "notebook": merged["notebook"], "todos": merged["todos"], "pdfs": merged["pdfs"],
         "reports": merged["reports"], "pulled": pulled["pulled"], "pushed": published["pushed"],
         "error": error or published["error"],
     }

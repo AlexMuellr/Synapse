@@ -14,7 +14,7 @@ import sys
 from typing import Optional
 
 DEFAULT_TIMEOUT = 30
-ATTRIBUTES = "*.json -merge\n*.json -diff\n"
+ATTRIBUTES = "*.json -merge\n*.json -diff\n*.pdf binary\n"
 IGNORE = "*.tmp\n"
 
 
@@ -83,11 +83,18 @@ def is_repo(folder: str) -> bool:
 
 
 def _ensure_files(folder: str) -> None:
+    """Create .gitattributes/.gitignore, and add rules a repository from an older version lacks."""
     for name, content in ((".gitattributes", ATTRIBUTES), (".gitignore", IGNORE)):
         path = os.path.join(folder, name)
-        if not os.path.exists(path):
+        existing = ""
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as handle:
+                existing = handle.read()
+        have = set(existing.split("\n"))
+        missing = [line for line in content.split("\n") if line and line not in have]
+        if missing or not os.path.exists(path):
             with open(path, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(content)
+                handle.write(existing + ("\n" if existing and not existing.endswith("\n") else "") + "\n".join(missing) + ("\n" if missing else ""))
 
 
 def _identity_args(folder: str) -> list[str]:

@@ -102,7 +102,8 @@
       <label class="title" data-i18n="sync_what">What to sync</label>
       <label class="check"><input type="checkbox" id="cat-notebook"><span class="t" data-i18n="sync_cat_notebook">Notebook</span></label>
       <label class="check"><input type="checkbox" id="cat-todos"><span class="t" data-i18n="sync_cat_todos">To-do list</span></label>
-      <div class="hint" data-i18n="sync_what_hint">PDFs, progress and settings are not synced yet. API keys are never synced.</div>
+      <label class="check"><input type="checkbox" id="cat-pdfs"><span><span class="t" data-i18n="sync_cat_pdfs">PDFs</span><br><span class="h" data-i18n="sync_pdfs_hint">Library, folders and the PDF files themselves (up to 50 MB each). Files make the repository grow quickly; consider Git LFS or a Dropbox folder.</span></span></label>
+      <div class="hint" data-i18n="sync_what_hint">Progress and settings are not synced yet. API keys are never synced.</div>
     </div>
     <div class="field">
       <label class="title" for="first" data-i18n="sync_first">First sync on a new computer</label>
@@ -183,7 +184,10 @@ function describeResult(r) {
   if (r.changed && (r.changed.notebook || r.changed.todos)) parts.push(T('sync_updated', 'New data from the other computer was added.'));
   if (r.conflicts && r.conflicts.length) parts.push(fmt(T('sync_conflicts', '{count} pages were changed on both computers. Both versions were kept; the other one is marked “(conflict)”.'), { count: r.conflicts.length }));
   if (r.skipped && r.skipped.length) parts.push(fmt(T('sync_skipped', '{count} damaged files were skipped.'), { count: r.skipped.length }));
-  showMessage(parts.join(' '), r.conflicts && r.conflicts.length ? 'warn' : 'ok');
+  if (r.files) parts.push(fmt(T('sync_pdf_files', '{count} PDF files were copied.'), { count: r.files }));
+  if (r.oversized && r.oversized.length) parts.push(fmt(T('sync_pdf_oversized', '{count} PDFs are larger than 50 MB: their entries are synced, the files are not.'), { count: r.oversized.length }));
+  if (r.missing_files) parts.push(fmt(T('sync_pdf_missing', '{count} PDFs have no file on this computer yet. Use the relink button in the PDF tab.'), { count: r.missing_files }));
+  showMessage(parts.join(' '), (r.conflicts && r.conflicts.length) || (r.oversized && r.oversized.length) || r.missing_files ? 'warn' : 'ok');
 }
 
 function renderGroup(container, title, items, code) {
@@ -228,7 +232,7 @@ function render(status) {
   const pending = $('pending');
   pending.replaceChildren();
   let any = false;
-  [['notebook', T('sync_cat_notebook', 'Notebook')], ['todos', T('sync_cat_todos', 'To-do list')]].forEach(([key, label]) => {
+  [['notebook', T('sync_cat_notebook', 'Notebook')], ['todos', T('sync_cat_todos', 'To-do list')], ['pdfs', T('sync_cat_pdfs', 'PDFs')]].forEach(([key, label]) => {
     const part = status.local && status.local[key];
     if (!part) return;
     const before = pending.childNodes.length;
@@ -266,6 +270,7 @@ function render(status) {
     $('auto-push').checked = !!cfg.sync_auto_push;
     $('cat-notebook').checked = !!cfg.sync_notebook;
     $('cat-todos').checked = !!cfg.sync_todos;
+    $('cat-pdfs').checked = !!cfg.sync_pdfs;
     $('first').value = cfg.sync_first || 'merge';
   }
   $('clone-field').style.display = $('use-git').checked ? '' : 'none';
@@ -275,7 +280,7 @@ function render(status) {
 function collect() {
   return {
     sync_folder: $('folder').value, sync_git: $('use-git').checked, sync_auto_pull: $('auto-pull').checked,
-    sync_auto_push: $('auto-push').checked, sync_notebook: $('cat-notebook').checked, sync_todos: $('cat-todos').checked,
+    sync_auto_push: $('auto-push').checked, sync_notebook: $('cat-notebook').checked, sync_todos: $('cat-todos').checked, sync_pdfs: $('cat-pdfs').checked,
     sync_first: $('first').value
   };
 }
@@ -296,7 +301,7 @@ $('btn-clone').onclick = () => {
   formDirty = false; send('save', collect()); busyLocal = true; if (S) render(S);
   send('clone', { url });
 };
-document.querySelectorAll('#folder,#use-git,#auto-pull,#auto-push,#cat-notebook,#cat-todos,#first').forEach(el => {
+document.querySelectorAll('#folder,#use-git,#auto-pull,#auto-push,#cat-notebook,#cat-todos,#cat-pdfs,#first').forEach(el => {
   el.addEventListener('input', () => { formDirty = true; $('clone-field').style.display = $('use-git').checked ? '' : 'none'; });
   el.addEventListener('change', () => { formDirty = true; $('clone-field').style.display = $('use-git').checked ? '' : 'none'; });
 });

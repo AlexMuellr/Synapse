@@ -249,5 +249,35 @@ const doc=blocks=>({pages:[{id:'A',title:'T',icon:'',blocks}],activePageId:'A'})
   }
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS markdown prefixes keep typing order (caret stays at the end)');
+
+  // ---- Numbered lists that start at any number ----
+  await load([{type:'text',html:''}]);await focusBlock(0);
+  await page.keyboard.type('3. first');
+  let numbered=await blocks();
+  assert.equal(numbered[0].type,'numbered');assert.equal(numbered[0].start,3,'typing "3. " starts the list at 3');
+  assert.equal(numbered[0].html,'first','the typed text follows the number in the right order');
+  await load([{type:'numbered',html:'a',start:3},{type:'numbered',html:'b'},{type:'numbered',html:'c',indent:1,start:7},{type:'numbered',html:'d',indent:1},{type:'text',html:'x'},{type:'numbered',html:'e'}]);
+  const sets=await page.evaluate(()=>Array.from(editor.children).map(el=>getComputedStyle(el).counterSet));
+  assert.deepEqual(sets,['nb0 3','none','nb1 7','none','none','none'],'only items with a start number set their counter');
+  assert.deepEqual((await blocks()).map(b=>b.start),[3,undefined,7,undefined,undefined,undefined],'start survives save and load');
+  await page.evaluate(()=>document.body.style.margin='20px');
+  if(process.env.SYNAPSE_TEST_SHOT)await page.screenshot({path:process.env.SYNAPSE_TEST_SHOT});
+  // Enter creates a plain next item; Tab keeps the start; converting away drops it
+  await load([{type:'numbered',html:'a',start:3}]);await focusBlock(0,false);await page.keyboard.press('Enter');
+  numbered=await blocks();assert.equal(numbered.length,2);assert.equal(numbered[1].start,undefined,'the next item continues numbering');
+  await load([{type:'numbered',html:'a',start:3},{type:'numbered',html:'b'}]);
+  await page.evaluate(()=>{const b=convertedBlock(editor.children[0],'bullet');editor.children[0].replaceWith(b);triggerSave();});
+  assert.equal((await blocks())[0].start,undefined,'a bullet has no start number');
+  await page.evaluate(()=>{const b=convertedBlock(editor.children[0],'numbered');editor.children[0].replaceWith(b);triggerSave();});
+  assert.equal((await blocks())[0].start,undefined);
+  // several digits, "1. " stays a plain list, years etc. need a following character
+  for(const [typed,start] of [['1. x',undefined],['12. x',12],['0. x',undefined]]){
+   await load([{type:'text',html:''}]);await focusBlock(0);await page.keyboard.type(typed);
+   const b=(await blocks())[0];
+   if(typed.startsWith('0.')) assert.equal(b.type,'numbered','0. also makes a list (it cannot start numbering)');
+   else {assert.equal(b.type,'numbered',typed);assert.equal(b.start,start,typed);}
+  }
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS numbered lists start at any number: typing, persistence, Enter, conversion');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -230,6 +230,9 @@ def _build_i18n_script(tool_name: str) -> str:
             "block_table":        _("Table"),
             "block_pagelink":     _("Link to page"),
             "paste_tip":          _("Tip: Paste images (Ctrl+V) supported"),
+            "highlight_selection": _("Highlight with the last color"),
+            "math_inline_placeholder": _("LaTeX, e.g. x^2"),
+            "math_inline_hint": _("Enter to finish · Esc to close"),
             "card_creator": _("Card Creator"),
             "creator_type": _('Card type'),
             "creator_basic": _('Basic (Front / Back)'),
@@ -344,7 +347,12 @@ def _build_i18n_script(tool_name: str) -> str:
             "sync_what": _("What to sync"),
             "sync_cat_notebook": _("Notebook"),
             "sync_cat_todos": _("To-do list"),
-            "sync_what_hint": _("PDFs, progress and settings are not synced yet. API keys are never synced."),
+            "sync_what_hint": _("Progress and settings are not synced yet. API keys are never synced."),
+            "sync_cat_pdfs": _("PDFs"),
+            "sync_pdfs_hint": _("Library, folders and the PDF files themselves (up to 50 MB each). Files make the repository grow quickly; consider Git LFS or a Dropbox folder."),
+            "sync_pdf_files": _("{count} PDF files were copied."),
+            "sync_pdf_oversized": _("{count} PDFs are larger than 50 MB: their entries are synced, the files are not."),
+            "sync_pdf_missing": _("{count} PDFs have no file on this computer yet. Use the relink button in the PDF tab."),
             "sync_first": _("First sync on a new computer"),
             "sync_first_merge": _("Keep both versions"),
             "sync_first_local": _("Prefer this computer"),
@@ -831,6 +839,18 @@ def _build_nav_html(active_tool: str, fs_active: bool = False,
     return f'<div id="synapse-tool-nav">{buttons}{fs_btn}</div>'
 
 
+def _tab_keys_script() -> str:
+    """Ctrl+Tab / Ctrl+Shift+Tab switching, shared by every tool page (see workspace_tab_keys.js)."""
+    try:
+        path = os.path.join(addon_dir(), "workspace_tab_keys.js")
+        with open(path, "r", encoding="utf-8") as handle:
+            source = handle.read()
+    except OSError as exc:
+        print(f"Notebook tab shortcuts unavailable: {exc}")
+        return ""
+    return source.replace("__BRIDGE__", ADDON_NAME_FOR_BRIDGE).replace("</", "<\\/")
+
+
 def _build_nav_toggle_script() -> str:
     """JS helpers that swap the fullscreen / window icons at runtime.
 
@@ -844,6 +864,7 @@ def _build_nav_toggle_script() -> str:
         "winClose": _WIN_ICON_CLOSE,
     }
     return (
+        '<script id="synapse-tab-keys">' + _tab_keys_script() + '</script>'
         '<script id="synapse-nav-toggle">'
         f'var __SNAV_ICONS__ = {json.dumps(icons)};'
         'window.__synapseSetFullscreen = function(active, t) {'
@@ -1647,6 +1668,7 @@ class NotebookPanel(QWidget):
         self.web: Optional[AnkiWebView] = None
         self.is_initialized    = False
         self.current_tool      = "notebook"
+        self._view_state: dict[str, dict] = {}   # last scroll position per tool, kept while Anki runs
         self._database_path = db_path()
         self._load_failed = False
         self.is_in_fullscreen  = False
@@ -2138,6 +2160,7 @@ class NotebookPanel(QWidget):
             current_deck_js = _json_for_script(_pdf_current_deck_name(), ensure_ascii=False)
             preload_tag  = (
                 f'<script id="synapse-preload">window.__SYNAPSE_PRELOAD__={preload_js};'
+                f'window.__SYNAPSE_NOTEBOOK_SHORTCUTS__={_json_for_script(_notebook_shortcuts(), ensure_ascii=False)};'
                 f'window.__SYNAPSE_DECKS__={deck_names_js};'
                 f'window.__SYNAPSE_CURRENT_DECK__={current_deck_js};</script>'
             )
@@ -2197,6 +2220,13 @@ class NotebookPanel(QWidget):
                 )
             html = re.sub(r'</head>', lambda m: preload_tag + m.group(0), html,
                           count=1, flags=re.IGNORECASE)
+
+        # ── Where the reader was the last time this tool was open ─────
+        view_tag = (
+            f'<script id="synapse-view-state">window.__SYNAPSE_VIEW_STATE__='
+            f'{_json_for_script(self._view_state.get(tool_name, {}))};</script>'
+        )
+        html = re.sub(r'</head>', lambda m: view_tag + m.group(0), html, count=1, flags=re.IGNORECASE)
 
         # ── Inject i18n translations ──────────────────────────────────
         i18n_tag = _build_i18n_script(tool_name)
@@ -2327,6 +2357,8 @@ class NotebookPanel(QWidget):
         # ── Tab switching ──────────────────────
         if payload.startswith("switch:"):
             tool = payload[len("switch:"):]
+            if tool in ("next", "prev"):
+                tool = self._neighbour_tool(1 if tool == "next" else -1)
             if tool in TOOL_FILES:
                 if tool == self.current_tool:
                     return
@@ -2430,12 +2462,49 @@ class NotebookPanel(QWidget):
             self._create_pdf_card_batch(payload[len("notes:create-batch:"):], notebook=True)
         elif payload.startswith("sync:"):
             self._handle_sync_command(payload[len("sync:"):])
+        elif payload.startswith("view:"):
+            self._remember_view_state(payload[len("view:"):])
         elif payload == "pdf:back":
             self._current_pdf_path = ""
             self._load_tool("pdf")
         elif payload.startswith("pdf:relink:"):
             pdf_id = payload[len("pdf:relink:"):]
             self._relink_pdf_dialog(pdf_id)
+
+    def _neighbour_tool(self, delta: int) -> str:
+        """The tab after/before the current one (Ctrl+Tab); repeated presses keep moving on."""
+        visible = workspace_preferences.enabled("notebook")
+        order = [key for key in ("notebook", "todo", "pdf") if visible.get(key)] + ["sync"]
+        current = self._pending_tool_switch or self.current_tool
+        index = order.index(current) if current in order else 0
+        return order[(index + delta) % len(order)]
+
+    def _remember_view_state(self, raw: str) -> None:
+        """Keep a tool's scroll position so switching tabs does not throw the reader back to the top."""
+        if len(raw) > 8000:
+            return
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return
+        tool = data.get("tool") if isinstance(data, dict) else None
+        state = data.get("state") if isinstance(data, dict) else None
+        if tool not in TOOL_FILES or not isinstance(state, dict):
+            return
+        clean: dict = {}
+        page = state.get("page")
+        if isinstance(page, str) and len(page) <= 200:
+            clean["page"] = page
+        scroll = state.get("scroll")
+        if isinstance(scroll, (int, float)) and not isinstance(scroll, bool):
+            clean["scroll"] = max(0, min(10_000_000, float(scroll)))
+        elif isinstance(scroll, dict):
+            clean["scroll"] = {
+                str(key)[:200]: max(0, min(10_000_000, float(value)))
+                for key, value in list(scroll.items())[:100]
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+            }
+        self._view_state[tool] = clean
 
     def _handle_sync_command(self, rest: str) -> None:
         """Messages from the Changes tab: refresh, save, run, choose-folder, clone."""
@@ -3099,6 +3168,16 @@ class _SyncIO:
             _refresh_dashboard_tasks()
         return saved
 
+    def read_pdfs(self) -> str:
+        return load_pdf_list(db_path())
+
+    def write_pdfs(self, body: str) -> bool:
+        return _save_snapshot("pdfs", body, db_path())
+
+    def pdf_store_dir(self) -> str:
+        """Copies of PDFs that came from another computer live here, inside the profile."""
+        return os.path.join(mw.pm.profileFolder() or addon_dir(), "SynapsePro_Data", "synced_pdfs")
+
     def flush(self, callback: Callable[[bool], None]) -> None:
         """Save the page that is open, so the merge starts from everything the user typed."""
         panel = self._panel()
@@ -3111,7 +3190,7 @@ class _SyncIO:
 
     def reload(self) -> None:
         panel = self._panel()
-        if panel is not None and panel.web and panel.current_tool in ("notebook", "todo"):
+        if panel is not None and panel.web and panel.current_tool in ("notebook", "todo", "pdf"):
             panel._reload_current_tool()
 
     def run_bg(self, fn, callback) -> None:
@@ -3176,6 +3255,33 @@ def _sync_final_push() -> None:
             controller.run("push", run_bg=lambda fn, callback: callback(fn()), flush=False, timeout=10, quiet=True)
     except Exception as exc:
         print(f"Notebook sync at close failed: {exc}")
+
+
+def _notebook_shortcuts() -> dict:
+    """Shortcuts the notebook page handles itself: portable text for matching plus a native label."""
+    try:
+        from . import addon_settings, constants, sidebar_shortcuts
+        raw = addon_settings.get("notebook_highlight_shortcut", constants.NOTEBOOK_HIGHLIGHT_DEFAULT)
+        portable = sidebar_shortcuts.normalise_sequence(raw) if raw else ""
+        if portable and not sidebar_shortcuts.is_safe_sequence(portable):
+            portable = ""
+        return {"highlight": portable, "highlightLabel": sidebar_shortcuts.display_sequence(portable)}
+    except Exception as exc:
+        print(f"Notebook shortcuts unavailable: {exc}")
+        return {"highlight": "", "highlightLabel": ""}
+
+
+def refresh_notebook_shortcuts() -> None:
+    """Hand changed shortcut settings to the open notebook page (no reload needed)."""
+    panel = _dock.widget() if _dock is not None else None
+    if isinstance(panel, NotebookPanel) and panel.web and panel.current_tool == "notebook":
+        try:
+            panel.web.eval(
+                "if(window.synapseSetNotebookShortcuts) window.synapseSetNotebookShortcuts("
+                f"{json.dumps(_notebook_shortcuts(), ensure_ascii=False)});"
+            )
+        except Exception:
+            pass
 
 
 def setup_notebook_sidebar():

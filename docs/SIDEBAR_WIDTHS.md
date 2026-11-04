@@ -1,6 +1,6 @@
 # Sidebar widths
 
-Widths are remembered separately for each main sidebar group during the current Anki/profile session. Closing Anki or destroying a profile's docks resets them. No config or user-content files are written.
+Widths are remembered separately for each main sidebar group during the current Anki/profile session. The Notebook group (Notebook, To-do, PDF, Changes) opens at 40% of the main window width (never below 400 px) until its separator is dragged; every other group opens at 400 px. Closing Anki or destroying a profile's docks resets them. No config or user-content files are written.
 
 `sidebar_widths.py` attaches a dock-owned Qt event filter and a cancellable timer. It restores the explicit shared starting width of 400 logical pixels (`DEFAULT_SIDEBAR_WIDTH`), independent of content size hints, until the user drags the main-window dock separator. Only separator resizing between a main-window mouse press and release records a preference. Resizing the main window, opening another dock, programmatic resizes, and floating/embedded/fullscreen geometry do not replace it. Opening a dock restores its preference within the available main-window space; a temporarily clamped width is not saved over the preference.
 

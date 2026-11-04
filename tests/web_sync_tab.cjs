@@ -2,9 +2,9 @@
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const status=(over={})=>({configured:true,folder_exists:true,git_available:true,device:'abc',last_sync:0,first_sync:false,busy:false,error:null,result:null,dirty:false,
- config:{sync_folder:'/home/me/sync',sync_git:true,sync_auto_pull:true,sync_auto_push:false,sync_notebook:true,sync_todos:true,sync_first:'merge'},
+ config:{sync_folder:'/home/me/sync',sync_git:true,sync_auto_pull:true,sync_auto_push:false,sync_notebook:true,sync_todos:true,sync_pdfs:false,sync_first:'merge'},
  git:{repo:true,branch:'main',remote:true,upstream:'origin/main',ahead:0,behind:0,changed:[]},
- local:{notebook:{added:[],modified:[],deleted:[]},todos:{added:[],modified:[],deleted:[]}},...over});
+ local:{notebook:{added:[],modified:[],deleted:[]},todos:{added:[],modified:[],deleted:[]},pdfs:null},...over});
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.SYNAPSE_TEST_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
  try {
@@ -57,6 +57,13 @@ const status=(over={})=>({configured:true,folder_exists:true,git_available:true,
   let msg=await page.locator('#message').textContent();
   assert.match(msg,/Synced\./);assert.match(msg,/New data from the other computer/);assert.match(msg,/1 pages were changed on both computers/);
   assert.match(await page.locator('#message').getAttribute('class'),/warn/,'a conflict is shown as a warning');
+  await page.evaluate(()=>window.syncResult({ok:true,kind:'sync',pushed:true,changed:{pdfs:true},conflicts:[],skipped:[],files:3,oversized:['big.pdf'],missing_files:2,error:null}));
+  msg=await page.locator('#message').textContent();
+  assert.match(msg,/3 PDF files were copied/);assert.match(msg,/1 PDFs are larger than 50 MB/);assert.match(msg,/2 PDFs have no file on this computer/);
+  assert.match(await page.locator('#message').getAttribute('class'),/warn/,'oversized or missing PDF files are a warning');
+  await render(status({local:{notebook:null,todos:null,pdfs:{added:[{id:'p',title:'lecture.pdf'}],modified:[],deleted:[]}}}));
+  assert.match(await page.locator('#pending').textContent(),/PDFs · New/);assert.match(await page.locator('#pending').textContent(),/lecture\.pdf/);
+  await render(status());
   await page.click('#btn-pull');
   assert.equal(await page.locator('#btn-push').isDisabled(),true,'no second command while one is running');
   await page.evaluate(()=>window.syncResult({ok:true,kind:'pull',changed:{},conflicts:[],skipped:[],error:null}));
@@ -76,10 +83,10 @@ const status=(over={})=>({configured:true,folder_exists:true,git_available:true,
   await render(status());
   await page.fill('#folder','/new/place');await page.uncheck('#use-git');
   assert.equal(await page.locator('#clone-field').isVisible(),false,'clone field only matters with Git');
-  await page.check('#auto-push');await page.uncheck('#cat-todos');await page.selectOption('#first','remote');
+  await page.check('#auto-push');await page.uncheck('#cat-todos');assert.equal(await page.isChecked('#cat-pdfs'),false,'PDFs are off by default');await page.check('#cat-pdfs');await page.selectOption('#first','remote');
   await page.evaluate(()=>{window.__cmds.length=0;});
   await page.click('#btn-save');
-  assert.deepEqual(JSON.parse((await cmds())[0].slice('save:'.length)),{sync_folder:'/new/place',sync_git:false,sync_auto_pull:true,sync_auto_push:true,sync_notebook:true,sync_todos:false,sync_first:'remote'});
+  assert.deepEqual(JSON.parse((await cmds())[0].slice('save:'.length)),{sync_folder:'/new/place',sync_git:false,sync_auto_pull:true,sync_auto_push:true,sync_notebook:true,sync_todos:false,sync_pdfs:true,sync_first:'remote'});
   // unsaved edits survive a status refresh; unsaved edits are saved before a run
   await page.fill('#folder','/typing');await render(status());
   assert.equal(await page.inputValue('#folder'),'/typing','a refresh never overwrites what you are typing');

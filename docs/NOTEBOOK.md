@@ -58,7 +58,14 @@ The Card Creator of the PDF tab is also available here (button **Card Creator** 
 - Card types: Basic, Basic + Reversed, Cloze. Deck field with search (`window.__SYNAPSE_DECKS__` and the current deck are injected when the notebook loads, so a deck created later appears after the next load; typing a new name creates it).
 - Select text in a note and use **Card front** / **Card back** in the format toolbar to append it to the draft. Option "Add the notebook page as source" puts the page title in small text on the back.
 - The unfinished session lives in the notebook snapshot as `cardCreatorSession` (sanitized when loaded, excluded from page undo/redo). It survives a restart.
-- Creating goes through `NotebookPanel._create_pdf_card_batch(body, notebook=True)`, the same validated, undoable batch as the PDF tab (answer callback `onNotebookCardBatchCreated`). Limits are the PDF ones: 500 cards per session, 50,000 characters per card. Text only, no images.
+- Creating goes through `NotebookPanel._create_pdf_card_batch(body, notebook=True)`, the same validated, undoable batch as the PDF tab (answer callback `onNotebookCardBatchCreated`). Limits are the PDF ones: 500 cards per session, 50,000 characters per card.
+
+### Pictures in card fields (Notebook and PDF Card Creator)
+**Ctrl+V** inside Front or Back pastes a picture at the cursor; text can be written above and below it. Dropping an image file on the field, or copying a picture out of a note, works too.
+- The field stays a plain `<textarea>` (the cloze tools keep working). The picture is a marker such as `[[img:3]]` on its own line, and a strip under the field shows the pictures in order (click a thumbnail to find its marker, **×** removes marker and picture). The card list shows a glyph instead of the marker.
+- Pictures live in the session next to the cards (`images`: id → `data:` URI, `nextImage`). Large screenshots are scaled to 1600 px and re-encoded (PNG, or JPEG when it would be big); at most 12 pictures per session, 2 MB each. Pictures no card or draft uses any more are dropped when the session is saved. Loaded sessions are cleaned (only well-formed png/jpeg/gif/webp).
+- On creating, the batch carries just the pictures cards use. `notebook_cards.decode_batch_images` checks them by their bytes (SVG rejected; at most 40 and 40 MB per batch) and `field_html` turns markers into `<img src="synapse_notes_<hash>.<ext>">` while text stays HTML-escaped. The files go to Anki's media folder, identical pictures once. A marker without its picture stops the batch with a message instead of silently losing the picture.
+- The code shared by both pages is `web_notebook/card_images.js` (inlined into the pages by `notebook_sidebar.py`).
 
 ## AI assistant and notes
 The chat (`chat_ui.html`, `ai_assistant.py`) can read notebook pages and suggest cards from them. Reading is strictly read-only.
@@ -95,4 +102,4 @@ All additive; older data and unknown fields keep working.
 
 ## Tests
 - Python: `test_notebook_text`, `test_notebook_cards`, `test_ai_notes_context`, `test_ai_cards_action`, `test_notebook_card_batch` (run with `python -m unittest discover -s tests -p "test_*.py"`).
-- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.
+- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`, `web_pdf_card_images.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.

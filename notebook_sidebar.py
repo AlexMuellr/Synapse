@@ -231,6 +231,11 @@ def _build_i18n_script(tool_name: str) -> str:
             "block_pagelink":     _("Link to page"),
             "paste_tip":          _("Tip: Paste images (Ctrl+V) supported"),
             "highlight_selection": _("Highlight with the last color"),
+            "card_img_hint": _("Paste a picture with Ctrl+V; it appears where the cursor is."),
+            "card_img_failed": _("This picture could not be added."),
+            "card_img_limit": _("A session can hold at most {count} pictures."),
+            "card_img_find": _("Click to find the picture in the text"),
+            "card_img_remove": _("Remove picture"),
             "math_inline_placeholder": _("LaTeX, e.g. x^2"),
             "math_inline_hint": _("Enter to finish · Esc to close"),
             "card_creator": _("Card Creator"),
@@ -494,6 +499,11 @@ def _build_i18n_script(tool_name: str) -> str:
             "select_pages_hint":   _("Click PDF pages to select them."),
             "cards_ready":         _("{count} cards ready"),
             "cards_label":         _("Cards"),
+            "card_img_hint":       _("Paste a picture with Ctrl+V; it appears where the cursor is."),
+            "card_img_failed":     _("This picture could not be added."),
+            "card_img_limit":      _("A session can hold at most {count} pictures."),
+            "card_img_find":       _("Click to find the picture in the text"),
+            "card_img_remove":     _("Remove picture"),
             "deck_name":           _("Deck name"),
             "deck_placeholder":    _("Choose an existing deck or enter a new name"),
             "current_deck":        _("Current deck"),
@@ -612,6 +622,19 @@ def _pdfjs_local_scripts() -> tuple[str, str]:
     except Exception as exc:
         print(f"SynapsePro: could not read PDF.js local files: {exc}")
         return "", ""
+
+
+_CARD_IMAGES_PLACEHOLDER = '<script id="synapse-card-images-placeholder"></script>'
+
+
+def _card_images_tag() -> str:
+    """Pictures inside card fields (Card Creators of the notebook and the PDF tab): inline, as setHtml has no base URL."""
+    try:
+        with open(os.path.join(addon_dir(), HTML_DIR, "card_images.js"), "r", encoding="utf-8") as handle:
+            return "<script>" + handle.read().replace("</", "<\\/") + "</script>"
+    except OSError as exc:
+        print(f"Card Creator pictures unavailable: {exc}")
+        return ""
 
 
 _KATEX_PLACEHOLDER = '<script id="synapse-katex-placeholder"></script>'
@@ -2136,6 +2159,8 @@ class NotebookPanel(QWidget):
         with open(html_path, "r", encoding="utf-8") as fh:
             html = fh.read()
 
+        if tool_name in ("notebook", "pdf"):
+            html = html.replace(_CARD_IMAGES_PLACEHOLDER, _card_images_tag(), 1)
         if tool_name == "todo":
             with open(os.path.join(addon_dir(), HTML_DIR, "task_schedule.js"), encoding="utf-8") as source:
                 html = html.replace('<script src="task_schedule.js"></script>', '<script>' + source.read() + '</script>')
@@ -2850,6 +2875,14 @@ class NotebookPanel(QWidget):
                 )
                 return
 
+            # Pictures pasted into card fields arrive separately; the text holds [[img:N]] markers.
+            from .notebook_cards import decode_batch_images, image_ids
+            try:
+                pictures = decode_batch_images(data.get("images"))
+            except ValueError:
+                self._notify_pdf_action(callback, False, _("One of the pictures is not valid."))
+                return
+
             cards: list[dict] = []
             total_chars = 0
             for raw_card in raw_cards:
@@ -2861,6 +2894,11 @@ class NotebookPanel(QWidget):
                     raise ValueError("PDF card fields must be strings")
                 front = front.strip()
                 back = back.strip()
+                if any(i not in pictures for i in image_ids(front) + image_ids(back)):
+                    self._notify_pdf_action(
+                        callback, False, _("A picture used in a card is missing. Paste it again.")
+                    )
+                    return
                 from .pdf_card_types import validate, card_count
                 kind = raw_card.get('type', 'basic')
                 try:
@@ -2933,14 +2971,18 @@ class NotebookPanel(QWidget):
 
         def create_batch(col):
             from .pdf_card_types import resolve
+            from .notebook_cards import field_html
             undo_entry = col.add_custom_undo_entry(undo_label)
             try:
                 types = {kind: resolve(col, kind) for kind in dict.fromkeys(card['type'] for card in cards)}
                 notes = []
                 for card in cards:
                     note = col.new_note(types[card['type']])
-                    note.fields[0] = NotebookPanel._pdf_text_to_html(card['front'])
-                    back_html = NotebookPanel._pdf_text_to_html(card['back'])
+                    front_html, front_media = field_html(card['front'], pictures)
+                    back_html, back_media = field_html(card['back'], pictures)
+                    for media_name, media_bytes in front_media + back_media:
+                        col.media.write_data(media_name, media_bytes)
+                    note.fields[0] = front_html
                     if card['include_source']:
                         back_html += (_notebook_source_html(card['source'] or source_filename) if notebook
                                       else _pdf_source_html(source_filename, card['pages'], pdf_id))

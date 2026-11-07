@@ -124,5 +124,80 @@ const doc=(blocks,extra={})=>({pages:[{id:'A',title:'Anatomy',icon:'',blocks}],a
   assert.equal(await page.evaluate(()=>document.getElementById('slash-menu').style.display==='block'),false);
   assert.deepEqual(errors,[],'no page errors');
   console.log('PASS notes card creator: panel, selection to front/back, cloze, edit, decks, session persistence, batch payload, errors');
+
+  // ---- pictures pasted into the text of a field (Ctrl+V), with text above and below ----
+  const png=(w,h,color='#2a6')=>page.evaluate(([w,h,color])=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle=color;x.fillRect(0,0,w,h);return c.toDataURL('image/png');},[w,h,color]);
+  const pasteImage=(sel,uri,extra={})=>page.evaluate(async([sel,uri,extra])=>{
+   const blob=await (await fetch(uri)).blob();const dt=new DataTransfer();
+   if(!extra.htmlOnly)dt.items.add(new File([blob],'shot.png',{type:'image/png'}));
+   if(extra.html)dt.setData('text/html',extra.html.replace('URI',uri));if(extra.text)dt.setData('text/plain',extra.text);
+   const e=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});document.querySelector(sel).dispatchEvent(e);return e.defaultPrevented;
+  },[sel,uri,extra]);
+  const dims=uri=>page.evaluate(u=>new Promise(r=>{const i=new Image();i.onload=()=>r([i.naturalWidth,i.naturalHeight]);i.src=u;}),uri);
+  await load([{type:'text',html:'x'}]);await page.evaluate(()=>{nbcOpen();});
+  await page.evaluate(()=>{delete appState.cardCreatorSession;});await page.evaluate(()=>nbcOpen());
+  await page.selectOption('#nbc-type','basic');
+  await page.fill('#nbc-front','above');await page.focus('#nbc-front');await page.keyboard.press('End');
+  const small=await png(60,40);
+  assert.equal(await pasteImage('#nbc-front',small),true,'a pasted picture is taken over by the creator');
+  await page.waitForFunction(()=>document.getElementById('nbc-front').value.includes('[[img:1]]'));
+  assert.equal(await page.inputValue('#nbc-front'),'above\n[[img:1]]\n','the marker sits on its own line at the cursor');
+  await page.keyboard.type('below');
+  assert.equal(await page.inputValue('#nbc-front'),'above\n[[img:1]]\nbelow','text can be written below the picture');
+  assert.equal(await page.locator('#nbc-front-images .creator-image').count(),1,'a thumbnail appears under the field');
+  // in the middle of a line, and a second picture
+  await page.fill('#nbc-back','abcd');await page.evaluate(()=>{const e=document.getElementById('nbc-back');e.focus();e.setSelectionRange(2,2);});
+  await pasteImage('#nbc-back',await png(30,30,'#c33'));
+  await page.waitForFunction(()=>document.getElementById('nbc-back').value.includes('[[img:'));
+  assert.equal(await page.inputValue('#nbc-back'),'ab\n[[img:2]]\ncd','pasting inside a line splits it around the picture');
+  // ordinary text paste is left to the browser
+  assert.equal(await page.evaluate(()=>{const dt=new DataTransfer();dt.setData('text/plain','just text');const e=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});document.getElementById('nbc-front').dispatchEvent(e);return e.defaultPrevented;}),false);
+  // a picture copied out of a note (HTML with a data: image and no text) is taken as well; with text it stays a text paste
+  await page.fill('#nbc-front','');
+  assert.equal(await pasteImage('#nbc-front',small,{htmlOnly:true,html:'<meta charset="utf-8"><img src="URI">'}),true);
+  await page.waitForFunction(()=>document.getElementById('nbc-front').value.includes('[[img:'));
+  assert.match(await page.inputValue('#nbc-front'),/^\[\[img:3\]\]\n$/);
+  assert.equal(await pasteImage('#nbc-front',small,{htmlOnly:true,html:'<img src="URI">',text:'caption text'}),false,'a clipboard with text is a text paste');
+  // big screenshots are scaled down
+  await page.fill('#nbc-front','');await pasteImage('#nbc-front',await png(3200,1800,'#36c'));
+  await page.waitForFunction(()=>document.getElementById('nbc-front').value.includes('[[img:4]]'));
+  const bigId=await page.evaluate(()=>Object.keys(appState.cardCreatorSession.images).includes('4'));assert.ok(bigId);
+  const [bw,bh]=await dims(await page.evaluate(()=>appState.cardCreatorSession.images['4']));
+  assert.ok(Math.max(bw,bh)<=1600,'large pictures are scaled to 1600 px ('+bw+'x'+bh+')');
+  // thumbnail: click finds the marker, × removes marker and picture
+  const idIn=side=>page.evaluate(side=>(document.getElementById('nbc-'+side).value.match(/\[\[img:(\d+)\]\]/)||[])[1],side);
+  await page.fill('#nbc-front','keep');await page.focus('#nbc-front');await page.keyboard.press('End');
+  await pasteImage('#nbc-front',small);await page.waitForFunction(()=>document.getElementById('nbc-front').value.includes('[[img:'));
+  await page.keyboard.type('more');
+  const keptId=await idIn('front');assert.equal(await page.inputValue('#nbc-front'),`keep\n[[img:${keptId}]]\nmore`);
+  await page.locator('#nbc-front-images .creator-image img').first().click();
+  assert.equal(await page.evaluate(()=>{const e=document.getElementById('nbc-front');return e.value.slice(e.selectionStart,e.selectionEnd);}),`[[img:${keptId}]]`,'clicking a thumbnail selects its marker');
+  await page.locator('#nbc-front-images .creator-image-remove').first().click();
+  assert.equal(await page.inputValue('#nbc-front'),'keep\nmore','removing a picture removes its marker and closes the gap');
+  assert.equal(await page.locator('#nbc-front-images .creator-image').count(),0);
+  // cards list shows a glyph; the session keeps only used pictures; the batch carries just those
+  await page.fill('#nbc-front','Q');await page.focus('#nbc-front');await page.keyboard.press('End');
+  await pasteImage('#nbc-front',small);await page.waitForFunction(()=>document.getElementById('nbc-front').value.includes('[[img:'));
+  await page.keyboard.type('what?');const usedId=await idIn('front');
+  await page.fill('#nbc-back','A');
+  await page.evaluate(()=>{document.getElementById('nbc-deck-name').value='Deck';document.getElementById('nbc-deck-name').dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.click('#nbc-add-card');
+  assert.match(await page.locator('.creator-card-front').last().textContent(),/Q\n?🖼\n?what\?/,'the marker shows as a picture glyph in the list');
+  await page.evaluate(()=>{window.__cmds=[];});
+  await page.click('#nbc-finish');
+  const [sent]=await batches();
+  assert.deepEqual(Object.keys(sent.images),[usedId],'only pictures that cards still use are sent');
+  assert.equal(sent.cards[0].front,`Q\n[[img:${usedId}]]\nwhat?`);
+  await page.evaluate(()=>onNotebookCardBatchCreated(true,'ok'));
+  await page.evaluate(()=>{persistNow();});
+  assert.deepEqual(Object.keys((await snap()).cardCreatorSession.images||{}),[],'after creating, unused pictures are not kept');
+  // restored session: malformed pictures are dropped
+  await load([{type:'text',html:'x'}]);
+  await page.evaluate(()=>{appState.cardCreatorSession={deckName:'D',cards:[],draft:{type:'basic',front:'[[img:5]] [[img:6]]',back:'',includeSource:false},images:{5:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9a8AAAAASUVORK5CYII=',6:'data:image/svg+xml;base64,PHN2Zz4=',x:'data:image/png;base64,AAAA'},nextImage:'bad'};});
+  await page.evaluate(()=>{delete window.__nothing;nbcRefresh();});
+  const restored=await page.evaluate(()=>{nbcOpen();return Object.keys(appState.cardCreatorSession.images);});
+  assert.deepEqual(restored,['5'],'only well-formed pictures survive loading a session');
+  assert.deepEqual(errors,[],'no page errors');
+  console.log('PASS card pictures: paste at the cursor, text above and below, scaling, thumbnails, payload, cleaning');
  } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

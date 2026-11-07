@@ -732,6 +732,14 @@
         #nb-card-creator .creator-btn.primary:hover { opacity: .86; }
         #nb-card-creator .creator-btn.danger { color: var(--nbc-danger); }
         #nb-card-creator .creator-btn:disabled { opacity: .42; cursor: default; }
+        #nb-card-creator .creator-images { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px; }
+        #nb-card-creator .creator-images[hidden] { display: none; }
+        #nb-card-creator .creator-image { position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: #fff; }
+        #nb-card-creator .creator-image img { display: block; max-width: 74px; max-height: 54px; object-fit: contain; cursor: pointer; }
+        #nb-card-creator .creator-image-number { position: absolute; left: 2px; bottom: 2px; min-width: 14px; padding: 0 3px; border-radius: 4px; background: rgba(0,0,0,.62); color: #fff; font-size: 9px; line-height: 14px; text-align: center; pointer-events: none; }
+        #nb-card-creator .creator-image-remove { position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text-gray); font-size: 11px; line-height: 13px; padding: 0; cursor: pointer; }
+        #nb-card-creator .creator-image-remove:hover { color: var(--nbc-danger); }
+        #nb-card-creator .creator-hint { color: var(--text-gray); font-size: 10.5px; line-height: 1.4; margin: -4px 0 10px; }
         #nbc-add-card { flex: 1; }
         #nbc-new-card { display: none; }
         #nbc-new-card.show { display: block; }
@@ -870,6 +878,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         #image-toolbar .tbl-btn { white-space:nowrap; }
 </style>
     <script id="synapse-katex-placeholder"></script>
+    <script id="synapse-card-images-placeholder"></script>
+    <script>if(!window.SynapseCardImages)document.write('<script src="card_images.js"><\/script>');</script>
 </head>
 <body>
 
@@ -1024,11 +1034,14 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 <div class="creator-field">
                     <label class="creator-label" for="nbc-front" id="nbc-front-label" data-i18n="draft_front">Front</label>
                     <textarea id="nbc-front" class="creator-textarea" maxlength="50000" data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></textarea>
+                    <div class="creator-images" id="nbc-front-images" hidden></div>
                 </div>
                 <div class="creator-field">
                     <label class="creator-label" for="nbc-back" id="nbc-back-label" data-i18n="draft_back">Back</label>
                     <textarea id="nbc-back" class="creator-textarea" maxlength="50000" data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></textarea>
+                    <div class="creator-images" id="nbc-back-images" hidden></div>
                 </div>
+                <div class="creator-hint" data-i18n="card_img_hint">Paste a picture with Ctrl+V; it appears where the cursor is.</div>
                 <label class="creator-source-row" for="nbc-include-source">
                     <input id="nbc-include-source" type="checkbox">
                     <span>
@@ -4731,6 +4744,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return {
                 id: typeof raw.id === 'string' ? raw.id : makeId(),
                 deckName: typeof raw.deckName === 'string' ? raw.deckName.slice(0, 250) : '',
+                images: SynapseCardImages.clean(raw.images),
+                nextImage: Number.isInteger(raw.nextImage) && raw.nextImage > 0 ? Math.min(raw.nextImage, 1000000) : 0,
                 cards, editingIndex: editing,
                 draft: {
                     type: TYPES.includes(draft.type) ? draft.type : 'basic',
@@ -4751,12 +4766,19 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             return appState.cardCreatorSession;
         }
         function hasWork(s) { return !!(s && ((s.cards && s.cards.length) || (s.draft && (s.draft.front || s.draft.back)))); }
+        // Keep only pictures some card or the draft still refers to, so the saved session stays small.
+        function pruneImages() {
+            const s = appState.cardCreatorSession;
+            if (!s) return;
+            s.images = SynapseCardImages.prune(s.images, [s.draft.front, s.draft.back, ...s.cards.flatMap(c => [c.front, c.back])]);
+        }
         function persist() {
             // Not a page edit: no history entry, just a debounced save of the whole state.
+            pruneImages();
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => { saveDirty = true; saveRevision++; clearTimeout(saveTimeout); saveTimeout = setTimeout(persistNow, 400); }, 250);
         }
-        function persistNowSoon() { clearTimeout(saveTimer); saveDirty = true; saveRevision++; clearTimeout(saveTimeout); saveTimeout = setTimeout(persistNow, 100); }
+        function persistNowSoon() { pruneImages(); clearTimeout(saveTimer); saveDirty = true; saveRevision++; clearTimeout(saveTimeout); saveTimeout = setTimeout(persistNow, 100); }
         function status(message, isError) {
             const el = $('nbc-status');
             el.textContent = message || '';
@@ -4801,6 +4823,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             typeUi();
             $('nbc-front').value = d.front;
             $('nbc-back').value = d.back;
+            imageFields.forEach(field => field.refresh());
             $('nbc-include-source').checked = d.includeSource;
             $('nbc-deck-name').value = s.deckName;
             const editing = s.editingIndex >= 0;
@@ -4813,8 +4836,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 const item = document.createElement('div'); item.className = 'creator-card-item';
                 const number = document.createElement('span'); number.className = 'creator-card-number'; number.textContent = String(index + 1);
                 const copy = document.createElement('div'); copy.className = 'creator-card-copy';
-                const front = document.createElement('div'); front.className = 'creator-card-front'; front.textContent = card.front;
-                const back = document.createElement('div'); back.className = 'creator-card-back'; back.textContent = card.back || '—';
+                const front = document.createElement('div'); front.className = 'creator-card-front'; front.textContent = SynapseCardImages.display(card.front);
+                const back = document.createElement('div'); back.className = 'creator-card-back'; back.textContent = SynapseCardImages.display(card.back) || '—';
                 copy.append(front, back);
                 const meta = [tx('creator_' + card.type, card.type === 'cloze' ? 'Cloze' : card.type === 'reversed' ? 'Basic + Reversed' : 'Basic')];
                 if (card.includeSource) meta.push(tx('source_short', 'Source'));
@@ -4896,6 +4919,15 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         });
         $('nbc-front').addEventListener('input', formChanged);
         $('nbc-back').addEventListener('input', formChanged);
+        // Ctrl+V of a picture inside Front/Back puts it at the cursor; text above and below stays editable.
+        const imageFields = ['front', 'back'].map(side => SynapseCardImages.attach($('nbc-' + side), {
+            images: () => session().images,
+            nextId: () => { const s = session(); s.nextImage = Number(SynapseCardImages.nextId(s.images, s.nextImage)); return String(s.nextImage); },
+            changed: () => { formChanged(); },
+            status: (message, isError) => status(message, isError),
+            preview: $('nbc-' + side + '-images'),
+            text: (key, fallback) => tx(key, fallback)
+        }));
         $('nbc-include-source').addEventListener('change', formChanged);
         // The editor's own shortcuts (Tab, "/" menu, block selection) must not fire while typing in the panel.
         panel.addEventListener('keydown', e => { if (e.key !== 'Escape') e.stopPropagation(); });
@@ -4988,6 +5020,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             pending = true; render();
             send(`${ADDON}:notes:create-batch:${JSON.stringify({
                 deckName, source: currentPageTitle(), pdfId: '',
+                images: SynapseCardImages.prune(s.images, s.cards.flatMap(c => [c.front, c.back])),
                 cards: s.cards.map(c => ({ front: c.front, back: c.back, type: c.type, includeSource: c.includeSource, source: c.source, pages: [] }))
             })}`);
         };

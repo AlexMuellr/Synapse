@@ -25,6 +25,8 @@ def method(name):
 class FakeCol:
     def __init__(self):
         self.added, self.decks, self.undo_entries = [], [], []
+        self.media_written = {}
+        self.media = types.SimpleNamespace(write_data=lambda name, data: (self.media_written.__setitem__(name, data), name)[1])
         col = self
         self.decks_api = types.SimpleNamespace(add_normal_deck_with_name=lambda name: (col.decks.append(name), types.SimpleNamespace(id=len(col.decks)))[1])
 
@@ -157,6 +159,50 @@ class NotebookBatchTests(Harness):
         self.assertEqual(self.col.undo_entries, ['Create PDF cards'])
         callback, ok, message = self.create({'deckName': 'PDFs', 'cards': [{'front': 'x' * 50_001, 'back': ''}]}, notebook=False)
         self.assertEqual(message, 'One of the PDF cards is too long.')
+
+    PNG = b'\x89PNG\r\n\x1a\n' + b'\x01' * 16
+    PNG_URI = 'data:image/png;base64,' + __import__('base64').b64encode(PNG).decode()
+
+    def test_pictures_pasted_into_fields_become_media_and_img_tags(self):
+        callback, ok, message = self.create({'deckName': 'D', 'images': {'1': self.PNG_URI, '2': self.PNG_URI}, 'cards': [
+            {'front': 'Look at this\n[[img:1]]\nwhat is it? <b>', 'back': '[[img:2]]\nAnswer', 'type': 'basic'},
+            {'front': '[[img:1]]', 'back': '', 'type': 'basic'},
+            {'front': 'A {{c1::cloze}}', 'back': 'Extra\n[[img:1]]', 'type': 'cloze'}]})
+        self.assertTrue(ok, message)
+        self.assertEqual(len(self.col.media_written), 1, 'the same picture is stored once however often it is used')
+        [(name, data)] = self.col.media_written.items()
+        self.assertEqual(data, self.PNG)
+        first, second, third = (r.note.fields for r in self.col.added)
+        self.assertEqual(first[0], f'Look at this<br><img src="{name}"><br>what is it? &lt;b&gt;', 'text above and below, escaped')
+        self.assertEqual(first[1], f'<img src="{name}"><br>Answer')
+        self.assertEqual(second, [f'<img src="{name}">', ''], 'a card may consist of a picture only')
+        self.assertEqual(third[1], f'Extra<br><img src="{name}">')
+        self.assertIn('Created', message)
+
+    def test_bad_pictures_stop_the_batch_without_creating_anything(self):
+        good = {'front': 'Q', 'back': '[[img:1]]', 'type': 'basic'}
+        cases = [
+            ({'images': {'1': 'data:image/svg+xml;base64,PHN2Zz4='}, 'cards': [good]}, 'not valid'),
+            ({'images': {'1': 'data:image/png;base64,AAAA'}, 'cards': [good]}, 'not valid'),
+            ({'images': {'x': self.PNG_URI}, 'cards': [good]}, 'not valid'),
+            ({'images': [self.PNG_URI], 'cards': [good]}, 'not valid'),
+            ({'images': {str(i): self.PNG_URI for i in range(1, 60)}, 'cards': [good]}, 'not valid'),
+            ({'images': {}, 'cards': [good]}, 'missing'),
+            ({'images': {'2': self.PNG_URI}, 'cards': [good]}, 'missing'),
+            ({'images': {'1': self.PNG_URI}, 'cards': [{'front': '[[img:9]]', 'back': '', 'type': 'basic'}]}, 'missing'),
+        ]
+        for payload, expected in cases:
+            callback, ok, message = self.create({'deckName': 'D', **payload})
+            self.assertEqual((callback, ok), ('onNotebookCardBatchCreated', False), payload)
+            self.assertIn(expected, message)
+        self.assertEqual(self.col.added, [])
+        self.assertEqual(self.col.media_written, {})
+
+    def test_pdf_mode_handles_pictures_too(self):
+        callback, ok, message = self.create({'deckName': 'PDFs', 'images': {'1': self.PNG_URI}, 'cards': [
+            {'front': 'Q [[img:1]]', 'back': 'A', 'type': 'basic'}]}, notebook=False)
+        self.assertEqual((callback, ok), ('onPdfCardBatchCreated', True), message)
+        self.assertIn('<img src="synapse_notes_', self.col.added[0].note.fields[0])
 
     def test_collection_failure_is_reported_in_notebook_words(self):
         self.col.add_notes = lambda requests: (_ for _ in ()).throw(RuntimeError('boom'))

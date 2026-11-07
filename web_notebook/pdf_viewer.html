@@ -14,6 +14,8 @@
   <title>PDF</title>
   <!-- Replaced at runtime with the pinned PDF.js bundle. -->
   <script id="synapse-pdfjs-placeholder"></script>
+  <script id="synapse-card-images-placeholder"></script>
+  <script>if(!window.SynapseCardImages)document.write('<script src="card_images.js"><\/script>');</script>
   <style>
     :root {
       --bg:           #ffffff;
@@ -454,6 +456,14 @@
     }
     .creator-textarea { min-height: 82px; max-height: 180px; resize: vertical; padding: 8px 9px; }
     #creator-back { min-height: 96px; }
+    .creator-images { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 0; }
+    .creator-images[hidden] { display: none; }
+    .creator-image { position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: #fff; }
+    .creator-image img { display: block; max-width: 74px; max-height: 54px; object-fit: contain; cursor: pointer; }
+    .creator-image-number { position: absolute; left: 2px; bottom: 2px; min-width: 14px; padding: 0 3px; border-radius: 4px; background: rgba(0,0,0,.62); color: #fff; font-size: 9px; line-height: 14px; text-align: center; pointer-events: none; }
+    .creator-image-remove { position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text-gray); font-size: 11px; line-height: 13px; padding: 0; cursor: pointer; }
+    .creator-image-remove:hover { color: var(--danger); }
+    .creator-hint { color: var(--text-gray); font-size: 10.5px; line-height: 1.4; margin: -2px 0 10px; }
     #creator-deck-name { height: 34px; padding: 6px 9px; }
     .creator-textarea:focus, #creator-deck-name:focus {
       border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 11%, transparent);
@@ -708,6 +718,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         </div>
         <textarea id="creator-front" class="creator-textarea" maxlength="50000"
                   data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></textarea>
+        <div class="creator-images" id="creator-front-images" hidden></div>
       </div>
       <div class="creator-field">
         <div class="creator-field-head">
@@ -716,7 +727,9 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         </div>
         <textarea id="creator-back" class="creator-textarea" maxlength="50000"
                   data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></textarea>
+        <div class="creator-images" id="creator-back-images" hidden></div>
       </div>
+      <div class="creator-hint" data-i18n="card_img_hint">Paste a picture with Ctrl+V; it appears where the cursor is.</div>
       <label class="creator-source-row" for="creator-include-source">
         <input id="creator-include-source" type="checkbox">
         <span class="creator-source-copy">
@@ -829,8 +842,15 @@ window.loadPdfs = function(jsonStr) {
   renderFolderBar();
   renderList();
 };
-function save() { pycmd('notion_mini:pdf:save:' + JSON.stringify(state)); }
+function save() { pruneCreatorImages(); pycmd('notion_mini:pdf:save:' + JSON.stringify(state)); }
+// Keep only pictures some card or the draft still refers to, so the saved session stays small.
+function pruneCreatorImages() {
+  const session = state.cardCreatorSession;
+  if (!session || !session.images) return;
+  session.images = SynapseCardImages.prune(session.images, [session.draft.front, session.draft.back, ...session.cards.flatMap(card => [card.front, card.back])]);
+}
 function scheduleCreatorSave() {
+  pruneCreatorImages();
   clearTimeout(creatorSaveTimer);
   creatorSaveTimer = setTimeout(() => { creatorSaveTimer = null; save(); }, 700);
 }
@@ -1617,6 +1637,8 @@ function sanitizeCreatorSession(raw, filename, path) {
       ? raw.pdfId
       : ((state.pdfs.find(item => item && item.path === path) || {}).id || ''),
     deckName: typeof raw.deckName === 'string' ? raw.deckName.slice(0, 250) : suggestedDeckName(filename),
+    images: SynapseCardImages.clean(raw.images),
+    nextImage: Number.isInteger(raw.nextImage) && raw.nextImage > 0 ? Math.min(raw.nextImage, 1000000) : 0,
     cards,
     editingIndex,
     draft: {
@@ -1843,6 +1865,7 @@ function renderCardCreator() {
   updateCreatorTypeUI();
   document.getElementById('creator-front').value = draft.front;
   document.getElementById('creator-back').value = draft.back;
+  creatorImageFields.forEach(field => field.refresh());
   document.getElementById('creator-include-source').checked = draft.includeSource;
   document.getElementById('creator-deck-name').value = session.deckName;
   document.getElementById('creator-front-pages').textContent = pagesLabel(draft.frontPages);
@@ -1864,8 +1887,8 @@ function renderCardCreator() {
     return `<div class="creator-card-item">
       <span class="creator-card-number">${index + 1}</span>
       <div class="creator-card-copy">
-        <div class="creator-card-front">${esc(card.front)}</div>
-        <div class="creator-card-back">${esc(card.back || '—')}</div>
+        <div class="creator-card-front">${esc(SynapseCardImages.display(card.front))}</div>
+        <div class="creator-card-back">${esc(SynapseCardImages.display(card.back) || '—')}</div>
         ${meta.length ? `<div class="creator-card-meta">${esc(meta.join(' · '))}</div>` : ''}
       </div>
       <button class="creator-item-btn" onclick="editCreatorCard(${index})" title="${esc(i18n.edit || 'Edit')}">✎</button>
@@ -2063,6 +2086,7 @@ function finishCreatorSession() {
   renderCardCreator();
   pycmd('notion_mini:pdf:create-batch:' + JSON.stringify({
     deckName,
+    images: SynapseCardImages.prune(session.images, session.cards.flatMap(card => [card.front, card.back])),
     pdfId: session.pdfId || currentPdfId || '',
     cards: session.cards.map(card => ({
       front: card.front, back: card.back, type: card.type,
@@ -2244,6 +2268,15 @@ document.addEventListener('pointerdown', event => {
 ['creator-front', 'creator-back', 'creator-deck-name'].forEach(id => {
   document.getElementById(id).addEventListener('input', creatorFormChanged);
 });
+// Ctrl+V of a picture inside Front/Back puts it at the cursor; text above and below stays editable.
+const creatorImageFields = ['front', 'back'].map(side => SynapseCardImages.attach(document.getElementById('creator-' + side), {
+  images: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; return session.images; },
+  nextId: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; session.nextImage = Number(SynapseCardImages.nextId(session.images, session.nextImage)); return String(session.nextImage); },
+  changed: () => creatorFormChanged(),
+  status: (message) => showStatus(message),
+  preview: document.getElementById('creator-' + side + '-images'),
+  text: (key, fallback) => creatorText(key, fallback),
+}));
 document.getElementById('creator-include-source').addEventListener('change', creatorFormChanged);
 const creatorDeckInput = document.getElementById('creator-deck-name');
 creatorDeckInput.addEventListener('focus', renderCreatorDeckMenu);

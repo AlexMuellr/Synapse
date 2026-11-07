@@ -95,5 +95,21 @@ class TabKeyTests(Base):
         self.assertNotIn('__BRIDGE__', script)
 
 
+class CardImagesModuleTests(Base):
+    def test_both_card_creators_get_the_picture_module(self):
+        module = self.module
+        tag = module._card_images_tag()
+        self.assertTrue(tag.startswith('<script>') and tag.endswith('</script>'))
+        self.assertIn('window.SynapseCardImages', tag)
+        self.assertNotIn('</script', tag[len('<script>'):-len('</script>')], 'the inlined code cannot close its own tag')
+        for page in ('index.html', 'pdf_viewer.html'):
+            html = (ROOT / 'web_notebook' / page).read_text(encoding='utf-8')
+            self.assertEqual(html.count(module._CARD_IMAGES_PLACEHOLDER), 1, page)
+            self.assertIn('card_images.js', html, 'a page opened as a file loads the module itself')
+            replaced = html.replace(module._CARD_IMAGES_PLACEHOLDER, tag, 1)
+            self.assertIn('window.SynapseCardImages', replaced)
+        self.assertEqual(module._CARD_IMAGES_PLACEHOLDER, '<script id="synapse-card-images-placeholder"></script>')
+
+
 if __name__ == '__main__':
     unittest.main()

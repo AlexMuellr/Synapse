@@ -114,5 +114,21 @@ class CardImagesModuleTests(Base):
         self.assertEqual(module._CARD_IMAGES_PLACEHOLDER, '<script id="synapse-card-images-placeholder"></script>')
 
 
+    def test_inlined_scripts_still_parse(self):
+        """Inlining turns every '</' into '<\\/': harmless in strings, fatal inside a regex literal."""
+        import shutil, subprocess, tempfile
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('node not installed')
+        tag = self.module._card_images_tag()
+        for index, part in enumerate(tag.split('</script><script>')):
+            code = part.replace('<script>', '', 1).replace('</script>', '')
+            with tempfile.TemporaryDirectory() as folder:
+                path = pathlib.Path(folder) / f'part{index}.js'
+                path.write_text(code, encoding='utf-8')
+                result = subprocess.run([node, '--check', str(path)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()

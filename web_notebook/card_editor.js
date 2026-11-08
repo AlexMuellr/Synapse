@@ -37,7 +37,7 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function esc(text) { return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function esc(text) { return text.replace(/&/g, '&amp;').replace(/[<]/g, '&lt;').replace(/>/g, '&gt;'); }
   // KaTeX: already on the page, inlined by the add-on (script tags with the source), or the bundled copy.
   var katexPromise = null;
   function katexReady() {

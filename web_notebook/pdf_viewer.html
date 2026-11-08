@@ -14,8 +14,10 @@
   <title>PDF</title>
   <!-- Replaced at runtime with the pinned PDF.js bundle. -->
   <script id="synapse-pdfjs-placeholder"></script>
+  <script id="synapse-katex-placeholder"></script>
   <script id="synapse-card-images-placeholder"></script>
   <script>if(!window.SynapseCardImages)document.write('<script src="card_images.js"><\/script>');</script>
+  <script>if(!window.SynapseCardEditor)document.write('<script src="card_editor.js"><\/script>');</script>
   <style>
     :root {
       --bg:           #ffffff;
@@ -381,6 +383,15 @@
       -webkit-user-select: text;
       pointer-events: auto;
     }
+    /* Search hits inside the text layer (the text itself is transparent; the mark is the highlight). */
+    .textLayer mark.pdf-hit { background: rgba(255, 213, 0, .5); color: transparent; border-radius: 2px; padding: 0; }
+    .textLayer mark.pdf-hit.active { background: rgba(255, 128, 0, .62); box-shadow: 0 0 0 1px rgba(255, 128, 0, .9); }
+    #find-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--header-bg); flex-shrink: 0; }
+    #find-bar[hidden] { display: none; }
+    #find-input { flex: 1; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--input-bg, var(--bg)); color: var(--text); font: 12px var(--font); }
+    #find-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent); }
+    #find-count { min-width: 64px; text-align: right; font-size: 11px; color: var(--text-gray); white-space: nowrap; }
+    #find-count.none { color: var(--danger); }
     .textLayer ::selection {
       background: color-mix(in srgb, var(--accent) 28%, transparent);
     }
@@ -456,13 +467,6 @@
     }
     .creator-textarea { min-height: 82px; max-height: 180px; resize: vertical; padding: 8px 9px; }
     #creator-back { min-height: 96px; }
-    .creator-images { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 0; }
-    .creator-images[hidden] { display: none; }
-    .creator-image { position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: #fff; }
-    .creator-image img { display: block; max-width: 74px; max-height: 54px; object-fit: contain; cursor: pointer; }
-    .creator-image-number { position: absolute; left: 2px; bottom: 2px; min-width: 14px; padding: 0 3px; border-radius: 4px; background: rgba(0,0,0,.62); color: #fff; font-size: 9px; line-height: 14px; text-align: center; pointer-events: none; }
-    .creator-image-remove { position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text-gray); font-size: 11px; line-height: 13px; padding: 0; cursor: pointer; }
-    .creator-image-remove:hover { color: var(--danger); }
     .creator-hint { color: var(--text-gray); font-size: 10.5px; line-height: 1.4; margin: -2px 0 10px; }
     #creator-deck-name { height: 34px; padding: 6px 9px; }
     .creator-textarea:focus, #creator-deck-name:focus {
@@ -671,6 +675,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
       <span class="creator-launch-text" data-i18n="card_creator">Card Creator</span>
       <span id="creator-count-badge"></span>
     </button>
+    <button class="vtb-icon-btn" id="btn-find" onclick="toggleFind()" title="Search in PDF (Ctrl+F)" data-i18n-title="find_btn" aria-label="Search in PDF" data-i18n-aria-label="find_btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </button>
     <span id="zoom-label">100%</span>
     <button class="vtb-icon-btn" id="btn-zoom-out" onclick="changeZoom(-0.2)" title="Zoom out" data-i18n-title="zoom_out">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -688,6 +697,20 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
         <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
       </svg>
+    </button>
+  </div>
+
+  <div id="find-bar" role="search" hidden>
+    <input id="find-input" type="search" placeholder="Search in PDF…" data-i18n-placeholder="find_placeholder" autocomplete="off" spellcheck="false" aria-label="Search in PDF" data-i18n-aria-label="find_placeholder">
+    <span id="find-count" role="status" aria-live="polite"></span>
+    <button class="vtb-icon-btn" id="find-prev" type="button" title="Previous result (Shift+Enter)" data-i18n-title="find_prev" aria-label="Previous result" data-i18n-aria-label="find_prev">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+    <button class="vtb-icon-btn" id="find-next" type="button" title="Next result (Enter)" data-i18n-title="find_next" aria-label="Next result" data-i18n-aria-label="find_next">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <button class="vtb-icon-btn" id="find-close" type="button" title="Close search (Esc)" data-i18n-title="find_close" aria-label="Close search" data-i18n-aria-label="find_close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
     </button>
   </div>
 
@@ -716,18 +739,16 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
           <label class="creator-label" for="creator-front" data-i18n="draft_front">Front</label>
           <span class="creator-page-hint" id="creator-front-pages"></span>
         </div>
-        <textarea id="creator-front" class="creator-textarea" maxlength="50000"
-                  data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></textarea>
-        <div class="creator-images" id="creator-front-images" hidden></div>
+        <div id="creator-front" class="creator-textarea"
+             data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></div>
       </div>
       <div class="creator-field">
         <div class="creator-field-head">
           <label class="creator-label" for="creator-back" data-i18n="draft_back">Back</label>
           <span class="creator-page-hint" id="creator-back-pages"></span>
         </div>
-        <textarea id="creator-back" class="creator-textarea" maxlength="50000"
-                  data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></textarea>
-        <div class="creator-images" id="creator-back-images" hidden></div>
+        <div id="creator-back" class="creator-textarea"
+             data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></div>
       </div>
       <div class="creator-hint" data-i18n="card_img_hint">Paste a picture with Ctrl+V; it appears where the cursor is.</div>
       <label class="creator-source-row" for="creator-include-source">
@@ -1188,6 +1209,7 @@ async function beginPdfSession() {
   currentPdfPath = '';
   currentPdfName = '';
   currentPdfId = '';
+  if (typeof resetFind === 'function') resetFind();
   clearPageWrappers();
 
   try {
@@ -1489,8 +1511,10 @@ async function renderPageInternal(pdf, pageNum, scale, generation, wrapper) {
           viewport: cssVP,
           textDivs: [],
         });
-        // PDF.js 3.x returns an object with a .promise.
-        return task && task.promise ? task.promise : Promise.resolve();
+        // PDF.js 3.x returns an object with a .promise. Search hits are marked once the spans exist.
+        return (task && task.promise ? task.promise : Promise.resolve()).then(() => {
+          if (renderIsCurrent(pdf, generation, wrapper, renderId)) applyFindHighlights(pageNum, textLayer);
+        });
       } catch(_e) { /* text layer is optional */ }
     }).catch(() => {});
   } catch(e) {
@@ -1511,6 +1535,232 @@ async function renderPageInternal(pdf, pageNum, scale, generation, wrapper) {
     syncPageWrapperSelection(wrapper);
   }
 }
+
+
+// ── Search in the open PDF ───────────────────────────────────────────────────
+// The text of every page is read once (PDF.js getTextContent) and kept as one normalised string per
+// page, so searching ignores case and accents and works across the whole document. Hits are marked in
+// the text layer of the pages that are rendered; the others are marked when they scroll into view.
+const pdfFind = { doc: null, pages: new Map(), indexing: null, query: '', hits: [], byPage: new Map(), current: -1, token: 0, timer: null, open: false };
+
+function findNorm(text) {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    let folded = ch.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    if (folded.length !== 1) folded = ch.toLowerCase().length === 1 ? ch.toLowerCase() : ch;
+    out += folded;
+  }
+  return out;
+}
+// One page: items (strings as PDF.js puts them in the text layer), the collapsed text and, for each of its
+// characters, the item and offset it came from (so a hit can be marked inside the right span).
+function findBuildPage(items) {
+  let flat = '';
+  const owner = [], offset = [];
+  items.forEach((str, index) => {
+    if (index && flat && flat[flat.length - 1] !== ' ' && str && !/^\s/.test(str)) { flat += ' '; owner.push(-1); offset.push(0); }
+    for (let i = 0; i < str.length; i++) {
+      const isSpace = /\s/.test(str[i]);
+      if (isSpace && (!flat || flat[flat.length - 1] === ' ')) continue;
+      flat += isSpace ? ' ' : str[i]; owner.push(index); offset.push(i);
+    }
+  });
+  return { items, flat, norm: findNorm(flat), owner, offset };
+}
+async function findEnsureIndex(onProgress) {
+  const pdf = currentPdfDoc;
+  if (!pdf) return false;
+  if (pdfFind.doc !== pdf) { pdfFind.doc = pdf; pdfFind.pages = new Map(); pdfFind.indexing = null; }
+  if (pdfFind.pages.size >= pdf.numPages) return true;
+  if (!pdfFind.indexing) {
+    pdfFind.indexing = (async () => {
+      for (let n = 1; n <= pdf.numPages; n++) {
+        if (pdfFind.doc !== pdf) return false;
+        if (!pdfFind.pages.has(n)) {
+          try {
+            const page = await pdf.getPage(n);
+            const content = await page.getTextContent();
+            pdfFind.pages.set(n, findBuildPage(content.items.filter(item => typeof item.str === 'string').map(item => item.str)));
+            page.cleanup();
+          } catch (_e) { pdfFind.pages.set(n, findBuildPage([])); }
+        }
+        if (n % 10 === 0) { if (pdfFind.progress) pdfFind.progress(n, pdf.numPages); await new Promise(resolve => setTimeout(resolve, 0)); }
+      }
+      return true;
+    })().finally(() => { pdfFind.indexing = null; });
+  }
+  pdfFind.progress = onProgress || null;
+  return pdfFind.indexing;
+}
+function findCountLabel() {
+  const label = document.getElementById('find-count');
+  label.classList.remove('none');
+  if (!pdfFind.query) { label.textContent = ''; return; }
+  if (!pdfFind.hits.length) { label.textContent = i18n('find_none', 'No results'); label.classList.add('none'); return; }
+  label.textContent = i18n('find_count', '{current} / {total}').replace('{current}', String(pdfFind.current + 1)).replace('{total}', String(pdfFind.hits.length));
+}
+function findClearMarks(root) {
+  (root || document).querySelectorAll('mark.pdf-hit').forEach(mark => {
+    const parent = mark.parentNode;
+    mark.replaceWith(document.createTextNode(mark.textContent));
+    if (parent) parent.normalize();
+  });
+}
+function findMarkActive(scroll) {
+  document.querySelectorAll('mark.pdf-hit.active').forEach(mark => mark.classList.remove('active'));
+  const mark = document.querySelector(`mark.pdf-hit[data-hit="${pdfFind.current}"]`);
+  if (!mark) return false;
+  mark.classList.add('active');
+  if (scroll) mark.scrollIntoView({ block: 'center', inline: 'nearest' });
+  return true;
+}
+// Called after a page's text layer exists (first render, zoom, scrolling back).
+function applyFindHighlights(pageNum, textLayer) {
+  if (!pdfFind.query || pdfFind.doc !== currentPdfDoc) return;
+  const info = pdfFind.pages.get(pageNum), hits = pdfFind.byPage.get(pageNum);
+  if (!info || !hits || !hits.length) return;
+  const spans = Array.from(textLayer.querySelectorAll('span'));
+  if (spans.length !== info.items.length) return;          // text layer differs from the index: skip rather than mis-mark
+  findClearMarks(textLayer);
+  const ranges = new Map();                                   // item -> [{from, to, hit}]
+  hits.forEach(hit => {
+    let run = null;
+    for (let i = hit.start; i < hit.end; i++) {
+      const item = info.owner[i];
+      if (item < 0) { run = null; continue; }
+      if (run && run.item === item && run.to === info.offset[i]) { run.to = info.offset[i] + 1; continue; }
+      run = { item, from: info.offset[i], to: info.offset[i] + 1, hit: hit.index };
+      if (!ranges.has(item)) ranges.set(item, []);
+      ranges.get(item).push(run);
+    }
+  });
+  ranges.forEach((list, item) => {
+    const span = spans[item], text = info.items[item];
+    if (!span || span.textContent !== text) return;
+    span.textContent = '';
+    let at = 0;
+    list.sort((a, b) => a.from - b.from).forEach(range => {
+      if (range.from > at) span.appendChild(document.createTextNode(text.slice(at, range.from)));
+      const mark = document.createElement('mark');
+      mark.className = 'pdf-hit'; mark.dataset.hit = String(range.hit); mark.textContent = text.slice(range.from, range.to);
+      span.appendChild(mark);
+      at = range.to;
+    });
+    if (at < text.length) span.appendChild(document.createTextNode(text.slice(at)));
+  });
+  if (pdfFind.current >= 0 && pdfFind.hits[pdfFind.current] && pdfFind.hits[pdfFind.current].page === pageNum) findMarkActive(pdfFind.pendingScroll);
+  if (pdfFind.pendingScroll && pdfFind.hits[pdfFind.current] && pdfFind.hits[pdfFind.current].page === pageNum) pdfFind.pendingScroll = false;
+}
+function findRun() {
+  const token = ++pdfFind.token;
+  const input = document.getElementById('find-input');
+  const query = input.value.replace(/\s+/g, ' ').trim();
+  pdfFind.query = query;
+  findClearMarks();
+  pdfFind.hits = []; pdfFind.byPage = new Map(); pdfFind.current = -1;
+  if (!query || !currentPdfDoc) { findCountLabel(); return; }
+  const label = document.getElementById('find-count');
+  const needIndex = !(pdfFind.doc === currentPdfDoc && pdfFind.pages.size >= currentPdfDoc.numPages);
+  if (needIndex) label.textContent = i18n('find_indexing', 'Indexing… {done} / {total}').replace('{done}', '0').replace('{total}', String(currentPdfDoc.numPages));
+  Promise.resolve(findEnsureIndex((done, total) => {
+    if (token === pdfFind.token) label.textContent = i18n('find_indexing', 'Indexing… {done} / {total}').replace('{done}', String(done)).replace('{total}', String(total));
+  })).then(() => {
+    if (token !== pdfFind.token || pdfFind.doc !== currentPdfDoc) return;
+    const needle = findNorm(query);
+    const hits = [];
+    for (let n = 1; n <= currentPdfDoc.numPages; n++) {
+      const info = pdfFind.pages.get(n);
+      if (!info) continue;
+      const pageHits = [];
+      for (let at = info.norm.indexOf(needle); at !== -1; at = info.norm.indexOf(needle, at + needle.length)) {
+        const hit = { page: n, start: at, end: at + needle.length, index: hits.length };
+        hits.push(hit); pageHits.push(hit);
+      }
+      if (pageHits.length) pdfFind.byPage.set(n, pageHits);
+    }
+    pdfFind.hits = hits;
+    // Start at the first hit on or after the page that is on screen.
+    const here = findVisiblePage();
+    const first = hits.findIndex(hit => hit.page >= here);
+    pdfFind.current = hits.length ? (first >= 0 ? first : 0) : -1;
+    findCountLabel();
+    document.querySelectorAll('.page-wrapper[data-rendered="1"]').forEach(wrapper => {
+      const layer = wrapper.querySelector('.textLayer');
+      if (layer) applyFindHighlights(Number(wrapper.dataset.page), layer);
+    });
+    if (pdfFind.current >= 0) findGoTo(pdfFind.current, true);
+  });
+}
+function findVisiblePage() {
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return 1;
+  const top = wrap.getBoundingClientRect().top;
+  const wrappers = wrap.querySelectorAll('.page-wrapper');
+  for (const item of wrappers) { if (item.getBoundingClientRect().bottom > top + 8) return Number(item.dataset.page) || 1; }
+  return 1;
+}
+function findGoTo(index, first) {
+  if (!pdfFind.hits.length) return;
+  pdfFind.current = (index + pdfFind.hits.length) % pdfFind.hits.length;
+  const hit = pdfFind.hits[pdfFind.current];
+  findCountLabel();
+  pdfFind.pendingScroll = true;
+  if (!findMarkActive(true)) {
+    // The page is not rendered yet: scroll to it; the hits are marked (and the active one shown) when it renders.
+    const wrapper = document.querySelector(`.page-wrapper[data-page="${hit.page}"]`);
+    if (wrapper) { wrapper.dataset.inRenderRange = '1'; wrapper.scrollIntoView({ block: 'start', inline: 'nearest' }); }
+    if (typeof currentPdfDoc !== 'undefined' && currentPdfDoc && wrapper) void renderPage(currentPdfDoc, hit.page, currentScale, renderGeneration);
+  } else pdfFind.pendingScroll = false;
+}
+function findStep(delta) {
+  if (!pdfFind.hits.length) { findRun(); return; }
+  findGoTo(pdfFind.current + delta);
+}
+function openFind() {
+  if (!currentPdfDoc) return;
+  pdfFind.open = true;
+  const bar = document.getElementById('find-bar'), input = document.getElementById('find-input');
+  bar.hidden = false;
+  const selected = window.getSelection && String(window.getSelection()).trim();
+  if (selected && selected.length < 80 && !selected.includes('\n')) input.value = selected;
+  input.focus(); input.select();
+  if (input.value.trim() && input.value.trim() !== pdfFind.query) findRun();
+}
+function closeFind() {
+  pdfFind.open = false;
+  document.getElementById('find-bar').hidden = true;
+  pdfFind.token++;
+  pdfFind.query = ''; pdfFind.hits = []; pdfFind.byPage = new Map(); pdfFind.current = -1;
+  findClearMarks();
+  findCountLabel();
+}
+function toggleFind() { if (pdfFind.open) closeFind(); else openFind(); }
+function resetFind() {
+  pdfFind.token++; pdfFind.doc = null; pdfFind.pages = new Map(); pdfFind.indexing = null; pdfFind.progress = null;
+  pdfFind.query = ''; pdfFind.hits = []; pdfFind.byPage = new Map(); pdfFind.current = -1; pdfFind.pendingScroll = false;
+  const bar = document.getElementById('find-bar');
+  if (bar) bar.hidden = true;
+  pdfFind.open = false;
+  const label = document.getElementById('find-count');
+  if (label) { label.textContent = ''; label.classList.remove('none'); }
+}
+(function wireFind() {
+  const input = document.getElementById('find-input');
+  input.addEventListener('input', () => { clearTimeout(pdfFind.timer); pdfFind.timer = setTimeout(findRun, 220); });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); clearTimeout(pdfFind.timer); if (input.value.replace(/\s+/g, ' ').trim() !== pdfFind.query) findRun(); else findStep(event.shiftKey ? -1 : 1); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeFind(); }
+  });
+  document.getElementById('find-next').addEventListener('click', () => findStep(1));
+  document.getElementById('find-prev').addEventListener('click', () => findStep(-1));
+  document.getElementById('find-close').addEventListener('click', closeFind);
+  document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f' && currentPdfDoc) {
+      event.preventDefault(); openFind();
+    } else if (event.key === 'F3' && currentPdfDoc && pdfFind.open) { event.preventDefault(); findStep(event.shiftKey ? -1 : 1); }
+  });
+})();
 
 function changeZoom(delta) {
   if (!currentPdfDoc) return;
@@ -1577,18 +1827,10 @@ function updateCreatorTypeUI() {
 function changeCreatorType(){if(creatorBatchPending)return;syncCreatorFormToSession();updateCreatorTypeUI();scheduleCreatorSave();}
 function insertCreatorCloze(same) {
   if(creatorBatchPending)return;
-  const el=document.getElementById('creator-front'), start=el.selectionStart,end=el.selectionEnd;
-  if(start===end){showStatus(creatorText('creator_select_cloze', 'Select the text you want to hide first.'));el.focus();return;}
-  const selected=el.value.slice(start,end);
-  if(/[{}]/.test(selected)){showStatus(creatorText('creator_plain_cloze', 'Select plain text outside an existing cloze.'));return;}
-  const before=el.value.slice(0,start);
-  if(before.lastIndexOf('{{')>before.lastIndexOf('}}')){showStatus(creatorText('creator_plain_cloze', 'Select plain text outside an existing cloze.'));return;}
-  const nums=[...el.value.matchAll(/\{\{c([1-9][0-9]*)::/g)].map(m=>Number(m[1]));
-  const number=same?Math.max(1,...nums):Math.max(0,...nums)+1;
-  if(number>999)return;
-  const replacement='{{c'+number+'::'+selected+'}}';
-  if(el.value.length+replacement.length-selected.length>50000)return;
-  el.setRangeText(replacement,start,end,'end');el.focus();syncCreatorFormToSession();scheduleCreatorSave();
+  const result=creatorEditors.front.cloze(!!same);
+  if(result==='empty'){showStatus(creatorText('creator_select_cloze', 'Select the text you want to hide first.'));document.getElementById('creator-front').focus();}
+  else if(result==='nested')showStatus(creatorText('creator_plain_cloze', 'Select plain text outside an existing cloze.'));
+  else if(result==='ok')document.getElementById('creator-front').focus();
 }
 
 function emptyCreatorDraft() {
@@ -1611,13 +1853,19 @@ function sanitizePages(values) {
     .sort((a, b) => a - b);
 }
 
-function sanitizeCreatorCard(raw) {
+// Fields are HTML (card_editor.js). Sessions saved by older versions hold plain text: converted once.
+function creatorFieldText(value, rich) {
+  if (typeof value !== 'string') return '';
+  return (rich ? value : SynapseCardEditor.fromLegacy(value)).slice(0, 50000);
+}
+
+function sanitizeCreatorCard(raw, rich) {
   raw = raw && typeof raw === 'object' ? raw : {};
   return {
     id: typeof raw.id === 'string' ? raw.id : uid(),
     type: ['basic','reversed','cloze'].includes(raw.type) ? raw.type : 'basic',
-    front: typeof raw.front === 'string' ? raw.front.slice(0, 50000) : '',
-    back: typeof raw.back === 'string' ? raw.back.slice(0, 50000) : '',
+    front: creatorFieldText(raw.front, rich),
+    back: creatorFieldText(raw.back, rich),
     pages: sanitizePages(raw.pages),
     includeSource: raw.includeSource === true,
   };
@@ -1626,7 +1874,7 @@ function sanitizeCreatorCard(raw) {
 function sanitizeCreatorSession(raw, filename, path) {
   raw = raw && typeof raw === 'object' ? raw : {};
   const draftRaw = raw.draft && typeof raw.draft === 'object' ? raw.draft : {};
-  const cards = Array.isArray(raw.cards) ? raw.cards.slice(0, 500).map(sanitizeCreatorCard) : [];
+  const cards = Array.isArray(raw.cards) ? raw.cards.slice(0, 500).map(card => sanitizeCreatorCard(card, raw.rich === true)) : [];
   let editingIndex = Number.isInteger(raw.editingIndex) ? raw.editingIndex : -1;
   if (editingIndex < 0 || editingIndex >= cards.length) editingIndex = -1;
   return {
@@ -1641,10 +1889,11 @@ function sanitizeCreatorSession(raw, filename, path) {
     nextImage: Number.isInteger(raw.nextImage) && raw.nextImage > 0 ? Math.min(raw.nextImage, 1000000) : 0,
     cards,
     editingIndex,
+    rich: true,
     draft: {
       type: ['basic','reversed','cloze'].includes(draftRaw.type) ? draftRaw.type : 'basic',
-      front: typeof draftRaw.front === 'string' ? draftRaw.front.slice(0, 50000) : '',
-      back: typeof draftRaw.back === 'string' ? draftRaw.back.slice(0, 50000) : '',
+      front: creatorFieldText(draftRaw.front, raw.rich === true),
+      back: creatorFieldText(draftRaw.back, raw.rich === true),
       frontPages: sanitizePages(draftRaw.frontPages),
       backPages: sanitizePages(draftRaw.backPages),
       sourcePages: sanitizePages(draftRaw.sourcePages),
@@ -1847,7 +2096,7 @@ function updateCreatorBadge() {
 
 function creatorCardCount(card) {
   if(card.type==='reversed')return 2;
-  if(card.type==='cloze')return new Set([...card.front.matchAll(/\{\{c([1-9][0-9]{0,2})::[^{}]+\}\}/g)].map(m=>m[1])).size;
+  if(card.type==='cloze')return new Set([...card.front.matchAll(/\{\{c([1-9][0-9]{0,2})::[\s\S]+?\}\}/g)].map(m=>m[1])).size;
   return 1;
 }
 function creatorFinishLabel(session) {
@@ -1863,9 +2112,11 @@ function renderCardCreator() {
   const i18n = window.__SYNAPSE_I18N__ || {};
   document.getElementById('creator-type').value = draft.type || 'basic';
   updateCreatorTypeUI();
-  document.getElementById('creator-front').value = draft.front;
-  document.getElementById('creator-back').value = draft.back;
-  creatorImageFields.forEach(field => field.refresh());
+  // Rewriting a field would move its cursor: only when the stored HTML differs from what the editor holds.
+  [['creator-front', draft.front], ['creator-back', draft.back]].forEach(([id, html]) => {
+    const field = document.getElementById(id);
+    if (field.value !== html) field.value = html;
+  });
   document.getElementById('creator-include-source').checked = draft.includeSource;
   document.getElementById('creator-deck-name').value = session.deckName;
   document.getElementById('creator-front-pages').textContent = pagesLabel(draft.frontPages);
@@ -1969,7 +2220,7 @@ function commitCreatorCard(silent) {
     document.getElementById('creator-front').focus();
     return false;
   }
-  if (draft.type === 'cloze' && !/\{\{c[1-9][0-9]{0,2}::[^{}]+\}\}/.test(front)) {
+  if (draft.type === 'cloze' && !/\{\{c[1-9][0-9]{0,2}::[\s\S]+?\}\}/.test(front)) {
     showStatus(creatorText('creator_cloze_required', 'Add at least one cloze deletion, for example {{c1::answer}}.'));return false;
   }
   if (draft.type === 'reversed' && !back) {showStatus(creatorText('creator_reverse_required', 'Reversed cards need text on both sides.'));return false;}
@@ -1988,7 +2239,7 @@ function commitCreatorCard(silent) {
     front, back, type: draft.type,
     pages: [...draft.frontPages, ...draft.backPages, ...draft.sourcePages],
     includeSource: draft.includeSource,
-  });
+  }, true);
   if (session.editingIndex >= 0) session.cards[session.editingIndex] = card;
   else {
     if (session.cards.length >= 500) {
@@ -2181,7 +2432,8 @@ function storePdfSelection(side) {
   const target = side === 'front' ? 'front' : 'back';
   const pagesTarget = side === 'front' ? 'frontPages' : 'backPages';
   const previous = session.draft[target].trim();
-  session.draft[target] = previous ? `${previous}\n${lastPdfSelection.text}` : lastPdfSelection.text;
+  const added = SynapseCardEditor.fromLegacy(lastPdfSelection.text);
+  session.draft[target] = (previous ? `${previous}<div>${added}</div>` : added).slice(0, 50000);
   session.draft[pagesTarget] = sanitizePages([...session.draft[pagesTarget], ...lastPdfSelection.pages]);
   if (side === 'front') {
     showStatus(window.__SYNAPSE_I18N__?.front_saved || 'Front saved');
@@ -2268,15 +2520,17 @@ document.addEventListener('pointerdown', event => {
 ['creator-front', 'creator-back', 'creator-deck-name'].forEach(id => {
   document.getElementById(id).addEventListener('input', creatorFormChanged);
 });
-// Ctrl+V of a picture inside Front/Back puts it at the cursor; text above and below stays editable.
-const creatorImageFields = ['front', 'back'].map(side => SynapseCardImages.attach(document.getElementById('creator-' + side), {
-  images: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; return session.images; },
-  nextId: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; session.nextImage = Number(SynapseCardImages.nextId(session.images, session.nextImage)); return String(session.nextImage); },
-  changed: () => creatorFormChanged(),
-  status: (message) => showStatus(message),
-  preview: document.getElementById('creator-' + side + '-images'),
-  text: (key, fallback) => creatorText(key, fallback),
-}));
+// Rich fields (headings, lists, formulas, pictures with Ctrl+V): the HTML they produce is plain Anki HTML.
+const creatorEditors = {};
+['front', 'back'].forEach(side => {
+  creatorEditors[side] = SynapseCardEditor.create(document.getElementById('creator-' + side), {
+    images: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; return session.images; },
+    nextId: () => { const session = ensureCreatorSession(); if (!session.images) session.images = {}; session.nextImage = Number(SynapseCardImages.nextId(session.images, session.nextImage)); return String(session.nextImage); },
+    changed: () => creatorFormChanged(),
+    status: (message) => showStatus(message),
+    text: (key, fallback) => creatorText(key, fallback),
+  });
+});
 document.getElementById('creator-include-source').addEventListener('change', creatorFormChanged);
 const creatorDeckInput = document.getElementById('creator-deck-name');
 creatorDeckInput.addEventListener('focus', renderCreatorDeckMenu);

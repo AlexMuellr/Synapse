@@ -732,13 +732,6 @@
         #nb-card-creator .creator-btn.primary:hover { opacity: .86; }
         #nb-card-creator .creator-btn.danger { color: var(--nbc-danger); }
         #nb-card-creator .creator-btn:disabled { opacity: .42; cursor: default; }
-        #nb-card-creator .creator-images { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px; }
-        #nb-card-creator .creator-images[hidden] { display: none; }
-        #nb-card-creator .creator-image { position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: #fff; }
-        #nb-card-creator .creator-image img { display: block; max-width: 74px; max-height: 54px; object-fit: contain; cursor: pointer; }
-        #nb-card-creator .creator-image-number { position: absolute; left: 2px; bottom: 2px; min-width: 14px; padding: 0 3px; border-radius: 4px; background: rgba(0,0,0,.62); color: #fff; font-size: 9px; line-height: 14px; text-align: center; pointer-events: none; }
-        #nb-card-creator .creator-image-remove { position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text-gray); font-size: 11px; line-height: 13px; padding: 0; cursor: pointer; }
-        #nb-card-creator .creator-image-remove:hover { color: var(--nbc-danger); }
         #nb-card-creator .creator-hint { color: var(--text-gray); font-size: 10.5px; line-height: 1.4; margin: -4px 0 10px; }
         #nbc-add-card { flex: 1; }
         #nbc-new-card { display: none; }
@@ -880,6 +873,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
     <script id="synapse-katex-placeholder"></script>
     <script id="synapse-card-images-placeholder"></script>
     <script>if(!window.SynapseCardImages)document.write('<script src="card_images.js"><\/script>');</script>
+    <script>if(!window.SynapseCardEditor)document.write('<script src="card_editor.js"><\/script>');</script>
 </head>
 <body>
 
@@ -1033,13 +1027,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 </div>
                 <div class="creator-field">
                     <label class="creator-label" for="nbc-front" id="nbc-front-label" data-i18n="draft_front">Front</label>
-                    <textarea id="nbc-front" class="creator-textarea" maxlength="50000" data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></textarea>
-                    <div class="creator-images" id="nbc-front-images" hidden></div>
+                    <div id="nbc-front" class="creator-textarea" data-i18n-placeholder="front_placeholder" placeholder="Question or prompt"></div>
                 </div>
                 <div class="creator-field">
                     <label class="creator-label" for="nbc-back" id="nbc-back-label" data-i18n="draft_back">Back</label>
-                    <textarea id="nbc-back" class="creator-textarea" maxlength="50000" data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></textarea>
-                    <div class="creator-images" id="nbc-back-images" hidden></div>
+                    <div id="nbc-back" class="creator-textarea" data-i18n-placeholder="back_placeholder" placeholder="Answer or explanation"></div>
                 </div>
                 <div class="creator-hint" data-i18n="card_img_hint">Paste a picture with Ctrl+V; it appears where the cursor is.</div>
                 <label class="creator-source-row" for="nbc-include-source">
@@ -4718,19 +4710,24 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         let pending = false, deckIndex = -1, statusTimer = null, saveTimer = null;
         const tx = (key, fallback) => i18nGet(key, fallback);
         const makeId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-        const clozeRe = /\{\{c([1-9][0-9]{0,2})::[^{}]+\}\}/g;
+        const clozeRe = /\{\{c([1-9][0-9]{0,2})::[\s\S]+?\}\}/g;
 
         function currentPageTitle() {
             const page = appState.pages.find(p => p.id === appState.activePageId);
             return String((page && page.title) || '').trim().slice(0, 250);
         }
-        function cleanCard(raw) {
+        // Fields are HTML (card_editor.js). Sessions saved by older versions hold plain text: converted once.
+        function fieldText(value, rich) {
+            if (typeof value !== 'string') return '';
+            return (rich ? value : SynapseCardEditor.fromLegacy(value)).slice(0, MAX_TEXT);
+        }
+        function cleanCard(raw, rich) {
             raw = raw && typeof raw === 'object' ? raw : {};
             return {
                 id: typeof raw.id === 'string' ? raw.id : makeId(),
                 type: TYPES.includes(raw.type) ? raw.type : 'basic',
-                front: typeof raw.front === 'string' ? raw.front.slice(0, MAX_TEXT) : '',
-                back: typeof raw.back === 'string' ? raw.back.slice(0, MAX_TEXT) : '',
+                front: fieldText(raw.front, rich),
+                back: fieldText(raw.back, rich),
                 includeSource: raw.includeSource === true,
                 source: typeof raw.source === 'string' ? raw.source.slice(0, 250) : ''
             };
@@ -4738,7 +4735,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         function cleanSession(raw) {
             raw = raw && typeof raw === 'object' ? raw : {};
             const draft = raw.draft && typeof raw.draft === 'object' ? raw.draft : {};
-            const cards = Array.isArray(raw.cards) ? raw.cards.slice(0, MAX_CARDS).map(cleanCard).filter(card => card.front.trim()) : [];
+            const cards = Array.isArray(raw.cards) ? raw.cards.slice(0, MAX_CARDS).map(card => cleanCard(card, raw.rich === true)).filter(card => card.front.trim()) : [];
             let editing = Number.isInteger(raw.editingIndex) ? raw.editingIndex : -1;
             if (editing < 0 || editing >= cards.length) editing = -1;
             return {
@@ -4749,10 +4746,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
                 cards, editingIndex: editing,
                 draft: {
                     type: TYPES.includes(draft.type) ? draft.type : 'basic',
-                    front: typeof draft.front === 'string' ? draft.front.slice(0, MAX_TEXT) : '',
-                    back: typeof draft.back === 'string' ? draft.back.slice(0, MAX_TEXT) : '',
+                    front: fieldText(draft.front, raw.rich === true),
+                    back: fieldText(draft.back, raw.rich === true),
                     includeSource: draft.includeSource === true
-                }
+                },
+                rich: true
             };
         }
         // Stored data is untrusted (older/newer versions, hand edits, sync): clean it once per object.
@@ -4817,13 +4815,13 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             badge.textContent = String(n);
             badge.classList.toggle('show', n > 0);
         }
+        // Rewriting a field would move its cursor: only when the stored HTML differs from what the editor holds.
+        function setField(id, html) { const el = $(id); if (el.value !== html) el.value = html; }
         function render() {
             const s = session(), d = s.draft;
             $('nbc-type').value = d.type;
             typeUi();
-            $('nbc-front').value = d.front;
-            $('nbc-back').value = d.back;
-            imageFields.forEach(field => field.refresh());
+            setField('nbc-front', d.front); setField('nbc-back', d.back);
             $('nbc-include-source').checked = d.includeSource;
             $('nbc-deck-name').value = s.deckName;
             const editing = s.editingIndex >= 0;
@@ -4919,15 +4917,17 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         });
         $('nbc-front').addEventListener('input', formChanged);
         $('nbc-back').addEventListener('input', formChanged);
-        // Ctrl+V of a picture inside Front/Back puts it at the cursor; text above and below stays editable.
-        const imageFields = ['front', 'back'].map(side => SynapseCardImages.attach($('nbc-' + side), {
-            images: () => session().images,
-            nextId: () => { const s = session(); s.nextImage = Number(SynapseCardImages.nextId(s.images, s.nextImage)); return String(s.nextImage); },
-            changed: () => { formChanged(); },
-            status: (message, isError) => status(message, isError),
-            preview: $('nbc-' + side + '-images'),
-            text: (key, fallback) => tx(key, fallback)
-        }));
+        // Rich fields (headings, lists, formulas, pictures with Ctrl+V): the HTML they produce is plain Anki HTML.
+        const editors = {};
+        ['front', 'back'].forEach(side => {
+            editors[side] = SynapseCardEditor.create($('nbc-' + side), {
+                images: () => session().images,
+                nextId: () => { const s = session(); s.nextImage = Number(SynapseCardImages.nextId(s.images, s.nextImage)); return String(s.nextImage); },
+                changed: () => { formChanged(); },
+                status: (message, isError) => status(message, isError),
+                text: (key, fallback) => tx(key, fallback)
+            });
+        });
         $('nbc-include-source').addEventListener('change', formChanged);
         // The editor's own shortcuts (Tab, "/" menu, block selection) must not fire while typing in the panel.
         panel.addEventListener('keydown', e => { if (e.key !== 'Escape') e.stopPropagation(); });
@@ -4937,16 +4937,10 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
         window.nbcTypeChanged = function () { if (pending) return; syncForm(); typeUi(); formChanged(); };
         window.nbcInsertCloze = function (same) {
             if (pending) return;
-            const el = $('nbc-front'), start = el.selectionStart, end = el.selectionEnd;
-            if (start === end) { status(tx('creator_select_cloze', 'Select the text you want to hide first.'), true); el.focus(); return; }
-            const selected = el.value.slice(start, end), before = el.value.slice(0, start);
-            if (/[{}]/.test(selected) || before.lastIndexOf('{{') > before.lastIndexOf('}}')) { status(tx('creator_plain_cloze', 'Select plain text outside an existing cloze.'), true); return; }
-            const nums = [...el.value.matchAll(/\{\{c([1-9][0-9]*)::/g)].map(m => Number(m[1]));
-            const number = same ? Math.max(1, ...nums) : Math.max(0, ...nums) + 1;
-            if (number > 999) return;
-            const replacement = '{{c' + number + '::' + selected + '}}';
-            if (el.value.length + replacement.length - selected.length > MAX_TEXT) return;
-            el.setRangeText(replacement, start, end, 'end'); el.focus(); formChanged();
+            const result = editors.front.cloze(!!same);
+            if (result === 'empty') { status(tx('creator_select_cloze', 'Select the text you want to hide first.'), true); $('nbc-front').focus(); }
+            else if (result === 'nested') status(tx('creator_plain_cloze', 'Select plain text outside an existing cloze.'), true);
+            else if (result === 'ok') $('nbc-front').focus();
         };
         window.nbcOpen = function (focusSide) {
             session();
@@ -4969,11 +4963,11 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             const s = session(); syncForm();
             const d = s.draft, front = d.front.trim(), back = d.back.trim();
             if (!front) { if (!silent) status(tx('front_required', 'Enter a front side first.'), true); $('nbc-front').focus(); return false; }
-            if (d.type === 'cloze' && !/\{\{c[1-9][0-9]{0,2}::[^{}]+\}\}/.test(front)) { status(tx('creator_cloze_required', 'Add at least one cloze deletion, for example {{c1::answer}}.'), true); return false; }
+            if (d.type === 'cloze' && !/\{\{c[1-9][0-9]{0,2}::[\s\S]+?\}\}/.test(front)) { status(tx('creator_cloze_required', 'Add at least one cloze deletion, for example {{c1::answer}}.'), true); return false; }
             if (d.type === 'reversed' && !back) { status(tx('creator_reverse_required', 'Reversed cards need text on both sides.'), true); return false; }
             if (front.length + back.length > MAX_TEXT) { status(tx('card_too_long', 'This card contains too much text.'), true); return false; }
             if (s.cards.some((c, i) => i !== s.editingIndex && c.type === d.type && c.front.trim() === front && c.back.trim() === back)) { status(tx('duplicate_card', 'This card is already in the session.'), true); return false; }
-            const card = cleanCard({ id: s.editingIndex >= 0 ? s.cards[s.editingIndex].id : makeId(), type: d.type, front, back, includeSource: d.includeSource, source: d.includeSource ? currentPageTitle() : '' });
+            const card = cleanCard({ id: s.editingIndex >= 0 ? s.cards[s.editingIndex].id : makeId(), type: d.type, front, back, includeSource: d.includeSource, source: d.includeSource ? currentPageTitle() : '' }, true);
             if (s.editingIndex >= 0) s.cards[s.editingIndex] = card;
             else { if (s.cards.length >= MAX_CARDS) { status(tx('too_many_cards', 'This session already contains 500 cards.'), true); return false; } s.cards.push(card); }
             clearDraft(s); render(); persistNowSoon();
@@ -5042,7 +5036,8 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
             const text = notebookRangeToText(selection.getRangeAt(0)).replace(/­/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
             if (!text) return;
             const s = session(), target = side === 'back' ? 'back' : 'front', previous = s.draft[target].trim();
-            s.draft[target] = (previous ? previous + '\n' + text : text).slice(0, MAX_TEXT);
+            const added = SynapseCardEditor.fromLegacy(text);
+            s.draft[target] = (previous ? previous + '<div>' + added + '</div>' : added).slice(0, MAX_TEXT);
             nbcOpen(side);
             status(tx(side === 'back' ? 'back_saved' : 'front_saved', side === 'back' ? 'Back saved' : 'Front saved'));
             persist();

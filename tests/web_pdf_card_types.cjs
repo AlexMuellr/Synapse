@@ -1,13 +1,13 @@
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),path=require('node:path');
-(async()=>{const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});try{
+(async()=>{const browser=await chromium.launch({executablePath:process.env.SYNAPSE_TEST_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});try{
 const page=await browser.newPage({viewport:{width:1000,height:850}});
 await page.goto('file://'+path.resolve(__dirname,'../web_notebook/pdf_viewer.html'));
 await page.evaluate(()=>{window.sent=[];window.pycmd=c=>sent.push(c);showViewer('Demo.pdf','/tmp/demo.pdf');openCardCreator();});
 await page.selectOption('#creator-type','cloze');await page.fill('#creator-front','The heart pumps blood.');
-await page.evaluate(()=>document.getElementById('creator-front').setSelectionRange(4,9));await page.getByRole('button',{name:'New cloze',exact:true}).click();
-assert.equal(await page.locator('#creator-front').inputValue(),'The {{c1::heart}} pumps blood.');
-await page.evaluate(()=>{const el=document.getElementById('creator-front');el.setSelectionRange(el.value.indexOf('blood'),el.value.indexOf('blood')+5);});await page.getByRole('button',{name:'Same card',exact:true}).click();
-assert.match(await page.locator('#creator-front').inputValue(),/\{\{c1::blood\}\}/);
+await page.evaluate(()=>{const el=document.getElementById('creator-front'),r=document.createRange(),sel=getSelection();el.focus();r.setStart(el.firstChild,4);r.setEnd(el.firstChild,9);sel.removeAllRanges();sel.addRange(r);});await page.getByRole('button',{name:'New cloze',exact:true}).click();
+assert.equal(await page.evaluate(()=>document.getElementById('creator-front').value),'The {{c1::heart}} pumps blood.');
+await page.evaluate(()=>{const el=document.getElementById('creator-front'),t=el.lastChild,i=t.data.indexOf('blood'),r=document.createRange(),sel=getSelection();el.focus();r.setStart(t,i);r.setEnd(t,i+5);sel.removeAllRanges();sel.addRange(r);});await page.getByRole('button',{name:'Same card',exact:true}).click();
+assert.match(await page.evaluate(()=>document.getElementById('creator-front').value),/\{\{c1::blood\}\}/);
 await page.locator('#creator-add-card').click();
 assert.equal(await page.evaluate(()=>state.cardCreatorSession.cards[0].type),'cloze');
 await page.selectOption('#creator-type','reversed');await page.fill('#creator-front','A');await page.locator('#creator-add-card').click();assert.equal(await page.evaluate(()=>state.cardCreatorSession.cards.length),1);

@@ -101,11 +101,14 @@ class CardImagesModuleTests(Base):
         tag = module._card_images_tag()
         self.assertTrue(tag.startswith('<script>') and tag.endswith('</script>'))
         self.assertIn('window.SynapseCardImages', tag)
-        self.assertNotIn('</script', tag[len('<script>'):-len('</script>')], 'the inlined code cannot close its own tag')
+        self.assertIn('window.SynapseCardEditor', tag)
+        for part in tag.split('</script><script>'):
+            self.assertNotIn('</script', part.replace('<script>', '').replace('</script>', ''), 'the inlined code cannot close its own tag')
         for page in ('index.html', 'pdf_viewer.html'):
             html = (ROOT / 'web_notebook' / page).read_text(encoding='utf-8')
             self.assertEqual(html.count(module._CARD_IMAGES_PLACEHOLDER), 1, page)
             self.assertIn('card_images.js', html, 'a page opened as a file loads the module itself')
+            self.assertIn('card_editor.js', html)
             replaced = html.replace(module._CARD_IMAGES_PLACEHOLDER, tag, 1)
             self.assertIn('window.SynapseCardImages', replaced)
         self.assertEqual(module._CARD_IMAGES_PLACEHOLDER, '<script id="synapse-card-images-placeholder"></script>')

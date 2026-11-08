@@ -3,13 +3,18 @@ import copy
 import re
 
 KINDS = {'basic': 0, 'reversed': 1, 'cloze': 4}
+# Fields are HTML: a cloze may contain markup and formulas with single braces, but ends at the first "}}".
+CLOZE = re.compile(r'\{\{c([1-9][0-9]{0,2})::.+?\}\}', re.S)
+
+def _has_content(markup):
+    return '<img' in markup or bool(re.sub(r'<[^>]*>|&nbsp;|\s', '', markup))
 
 def validate(kind, front, back):
     if kind not in KINDS:
         raise ValueError('Unknown card type')
-    if kind == 'cloze' and not re.search(r'\{\{c([1-9][0-9]{0,2})::[^{}]+\}\}', front):
+    if kind == 'cloze' and not CLOZE.search(front):
         raise ValueError('Add at least one cloze deletion, for example {{c1::answer}}.')
-    if kind == 'reversed' and not back.strip():
+    if kind == 'reversed' and not _has_content(back):
         raise ValueError('Reversed cards need text on both sides.')
 
 def resolve(col, kind):
@@ -36,5 +41,5 @@ def card_count(card):
     if kind == 'reversed':
         return 2
     if kind == 'cloze':
-        return len(set(re.findall(r'\{\{c([1-9][0-9]{0,2})::[^{}]+\}\}', card['front'])))
+        return len(set(CLOZE.findall(card['front'])))
     return 1

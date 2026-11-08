@@ -117,20 +117,6 @@ class PrepareNotesTests(unittest.TestCase):
 
 
 class FieldPictureTests(unittest.TestCase):
-    def test_markers_become_images_and_text_stays_escaped(self):
-        images = {'1': (PNG, 'png'), '2': (b'\xff\xd8\xff' + b'1' * 8, 'jpg')}
-        html, media = nc.field_html('  top <b>\n[[img:1]]\nmiddle [[img:2]] end\r\nlast  ', images)
-        names = [name for name, _ in media]
-        self.assertEqual(html, f'top &lt;b&gt;<br><img src="{names[0]}"><br>middle <img src="{names[1]}"> end<br>last')
-        self.assertEqual([data for _, data in media], [PNG, b'\xff\xd8\xff' + b'1' * 8])
-        self.assertEqual(nc.field_html('plain', {}), ('plain', []))
-        self.assertEqual(nc.field_html('', {}), ('', []))
-        self.assertEqual(nc.field_html('a [[img: 1]] [[img:x]]', images)[0], 'a [[img: 1]] [[img:x]]', 'malformed markers stay text')
-
-    def test_a_marker_without_its_picture_is_an_error_not_a_silent_loss(self):
-        with self.assertRaises(ValueError):
-            nc.field_html('x [[img:3]]', {'1': (PNG, 'png')})
-
     def test_batch_pictures_are_validated_by_their_bytes_and_limits(self):
         ok = nc.decode_batch_images({'1': PNG_URI, '22': JPG_URI})
         self.assertEqual({k: v[1] for k, v in ok.items()}, {'1': 'png', '22': 'jpg'})
@@ -144,8 +130,6 @@ class FieldPictureTests(unittest.TestCase):
         with unittest.mock.patch.object(nc, 'MAX_BATCH_IMAGE_BYTES', 30):
             with self.assertRaises(ValueError):
                 nc.decode_batch_images({'1': PNG_URI, '2': PNG_URI})
-        self.assertEqual(nc.image_ids('a [[img:1]] b [[img:20]] [[img:1]]'), ['1', '20', '1'])
-        self.assertEqual(nc.image_ids(None), [])
 
 
 if __name__ == '__main__':

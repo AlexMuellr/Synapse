@@ -138,7 +138,7 @@ const atom=(latex)=>`<span class="math-inline" data-latex="${latex}"></span>`;
   // ---- the card creator takes formulas as \( \) ----
   await load([{type:'text',html:`the area is ${atom('\\pi r^2')} always`}]);await page.waitForSelector('#editor .math-inline[data-rendered]');
   await page.evaluate(()=>{const f=editor.children[0],r=document.createRange();r.selectNodeContents(f);f.focus();const s=getSelection();s.removeAllRanges();s.addRange(r);nbcUseSelection('front');});
-  assert.equal(await page.inputValue('#nbc-front'),'the area is \\(\\pi r^2\\) always','the card draft holds the formula as Anki renders it');
+  assert.equal(await page.evaluate(sel=>document.querySelector(sel).value,'#nbc-front'),'the area is \\(\\pi r^2\\) always','the card draft holds the formula as Anki renders it');
 
   // ---- empty-looking block with only a formula is not treated as empty ----
   await load([{type:'text',html:'a'},{type:'text',html:atom('x')}]);

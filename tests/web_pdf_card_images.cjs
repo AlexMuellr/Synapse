@@ -11,14 +11,15 @@ const root=path.resolve(__dirname,'..');
   await page.evaluate(()=>{showViewer('a.pdf','/lib/a.pdf');currentPdfPath='/lib/a.pdf';currentPdfName='a.pdf';currentPdfId='p1';openCardCreator();});
   const png=(w,h,c='#2a6')=>page.evaluate(([w,h,c])=>{const k=document.createElement('canvas');k.width=w;k.height=h;const x=k.getContext('2d');x.fillStyle=c;x.fillRect(0,0,w,h);return k.toDataURL('image/png');},[w,h,c]);
   const paste=(sel,uri)=>page.evaluate(async([sel,uri])=>{const blob=await (await fetch(uri)).blob();const dt=new DataTransfer();dt.items.add(new File([blob],'s.png',{type:'image/png'}));const e=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});document.querySelector(sel).dispatchEvent(e);return e.defaultPrevented;},[sel,uri]);
-  await page.fill('#creator-front','What is shown?');await page.focus('#creator-front');await page.keyboard.press('End');
+  const val=sel=>page.evaluate(s=>document.querySelector(s).value,sel);
+  await page.click('#creator-front');await page.keyboard.type('What is shown?');
   assert.equal(await paste('#creator-front',await png(80,50)),true);
-  await page.waitForFunction(()=>document.getElementById('creator-front').value.includes('[[img:1]]'));
+  await page.waitForFunction(()=>document.getElementById('creator-front').value.includes('data-img="1"'));
   await page.keyboard.type('Explain it.');
-  assert.equal(await page.inputValue('#creator-front'),'What is shown?\n[[img:1]]\nExplain it.','text above and below the picture');
-  assert.equal(await page.locator('#creator-front-images .creator-image').count(),1);
-  await page.fill('#creator-back','Answer');await page.focus('#creator-back');await page.keyboard.press('End');
-  await paste('#creator-back',await png(40,40,'#c33'));await page.waitForFunction(()=>document.getElementById('creator-back').value.includes('[[img:2]]'));
+  assert.equal(await val('#creator-front'),'What is shown?<img data-img="1">Explain it.','text above and below the picture');
+  assert.equal(await page.locator('#creator-front img').count(),1);
+  await page.click('#creator-back');await page.keyboard.type('Answer');
+  await paste('#creator-back',await png(40,40,'#c33'));await page.waitForFunction(()=>document.getElementById('creator-back').value.includes('data-img="2"'));
   await page.fill('#creator-deck-name','Anatomy');
   await page.evaluate(()=>document.getElementById('creator-deck-name').dispatchEvent(new Event('input',{bubbles:true})));
   await page.click('#creator-add-card');
@@ -30,19 +31,19 @@ const root=path.resolve(__dirname,'..');
   assert.equal(sent.length,1);
   assert.deepEqual(Object.keys(sent[0].images).sort(),['1','2']);
   assert.match(sent[0].images['1'],/^data:image\/png;base64,/);
-  assert.equal(sent[0].cards[0].front,'What is shown?\n[[img:1]]\nExplain it.');
-  assert.equal(sent[0].cards[0].back,'Answer\n[[img:2]]');
+  assert.equal(sent[0].cards[0].front,'What is shown?<img data-img="1">Explain it.');
+  assert.equal(sent[0].cards[0].back,'Answer<img data-img="2">');
   // the saved library (which holds the session) keeps the pictures only while a card uses them
   await page.evaluate(()=>save());
   const saved=await page.evaluate(()=>window.__cmds.filter(c=>c.startsWith('notion_mini:pdf:save:')).map(c=>JSON.parse(c.slice('notion_mini:pdf:save:'.length))).at(-1));
   assert.deepEqual(Object.keys(saved.cardCreatorSession.images).sort(),['1','2']);
   await page.evaluate(()=>window.onPdfCardBatchCreated(false,'not now'));   // the batch ends; the page is usable again
   // a session loaded from disk is cleaned
-  await page.evaluate(()=>{state.cardCreatorSession={pdfPath:'/lib/a.pdf',deckName:'D',cards:[],draft:{type:'basic',front:'x [[img:7]]'},images:{7:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9a8AAAAASUVORK5CYII=',8:'data:text/html;base64,PGI+',z:'x'}};state.cardCreatorSession=sanitizeCreatorSession(state.cardCreatorSession,'a.pdf','/lib/a.pdf');});
+  await page.evaluate(()=>{state.cardCreatorSession={pdfPath:'/lib/a.pdf',deckName:'D',rich:true,cards:[],draft:{type:'basic',front:'x <img data-img="7">'},images:{7:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9a8AAAAASUVORK5CYII=',8:'data:text/html;base64,PGI+',z:'x'}};state.cardCreatorSession=sanitizeCreatorSession(state.cardCreatorSession,'a.pdf','/lib/a.pdf');});
   assert.deepEqual(await page.evaluate(()=>Object.keys(state.cardCreatorSession.images)),['7']);
   // limit of pictures per session
   await page.evaluate(()=>{state.cardCreatorSession=sanitizeCreatorSession({},'a.pdf','/lib/a.pdf');renderCardCreator();});
-  await page.fill('#creator-front','');await page.focus('#creator-front');
+  await page.click('#creator-front');
   const tiny=await png(8,8);
   for(let i=0;i<13;i++){await paste('#creator-front',tiny);await page.waitForTimeout(40);}
   await page.waitForTimeout(300);

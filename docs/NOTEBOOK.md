@@ -53,6 +53,9 @@ Blocks are separate editable fields, so the browser cannot select text across th
 - Switching between Notebook, To-do, PDF and Changes reloads the page, which used to throw you back to the top. The pages now report their scroll position (debounced) to the add-on, which keeps it while Anki runs and hands it back on load (`window.__SYNAPSE_VIEW_STATE__`). The notebook remembers it per page, also when you switch pages inside the notebook or the data is reloaded after a sync; the to-do list remembers its own position. The PDF viewer does not restore its page yet.
 - **Ctrl+Tab** and **Ctrl+Shift+Tab** (or **Ctrl+PageDown** / **Ctrl+PageUp**) switch to the next/previous visible tab and wrap around; tabs you have hidden in the workspace settings are skipped, the Changes tab is always included. The handler (`workspace_tab_keys.js`) is inlined into every tool page and runs before the focused field sees the key.
 
+## PDF search
+In the PDF tab, **Ctrl+F** (or the magnifier button) opens a search bar; **Enter** / **Shift+Enter** or F3 step through the hits, **Esc** closes it. The whole document is searched, ignoring case and accents (`CAFE` finds "Café"), and several spaces count as one. The first search reads the text of every page once (progress is shown); hits on the visible pages are highlighted and the current one is scrolled into view, also on pages that are not rendered yet. A new document or zoom change keeps the search working.
+
 ## Card Creator in the Notebook
 The Card Creator of the PDF tab is also available here (button **Card Creator** in the notebook header).
 - Card types: Basic, Basic + Reversed, Cloze. Deck field with search (`window.__SYNAPSE_DECKS__` and the current deck are injected when the notebook loads, so a deck created later appears after the next load; typing a new name creates it).
@@ -60,12 +63,26 @@ The Card Creator of the PDF tab is also available here (button **Card Creator** 
 - The unfinished session lives in the notebook snapshot as `cardCreatorSession` (sanitized when loaded, excluded from page undo/redo). It survives a restart.
 - Creating goes through `NotebookPanel._create_pdf_card_batch(body, notebook=True)`, the same validated, undoable batch as the PDF tab (answer callback `onNotebookCardBatchCreated`). Limits are the PDF ones: 500 cards per session, 50,000 characters per card.
 
-### Pictures in card fields (Notebook and PDF Card Creator)
-**Ctrl+V** inside Front or Back pastes a picture at the cursor; text can be written above and below it. Dropping an image file on the field, or copying a picture out of a note, works too.
-- The field stays a plain `<textarea>` (the cloze tools keep working). The picture is a marker such as `[[img:3]]` on its own line, and a strip under the field shows the pictures in order (click a thumbnail to find its marker, **×** removes marker and picture). The card list shows a glyph instead of the marker.
-- Pictures live in the session next to the cards (`images`: id → `data:` URI, `nextImage`). Large screenshots are scaled to 1600 px and re-encoded (PNG, or JPEG when it would be big); at most 12 pictures per session, 2 MB each. Pictures no card or draft uses any more are dropped when the session is saved. Loaded sessions are cleaned (only well-formed png/jpeg/gif/webp).
-- On creating, the batch carries just the pictures cards use. `notebook_cards.decode_batch_images` checks them by their bytes (SVG rejected; at most 40 and 40 MB per batch) and `field_html` turns markers into `<img src="synapse_notes_<hash>.<ext>">` while text stays HTML-escaped. The files go to Anki's media folder, identical pictures once. A marker without its picture stops the batch with a message instead of silently losing the picture.
-- The code shared by both pages is `web_notebook/card_images.js` (inlined into the pages by `notebook_sidebar.py`).
+### Rich card fields (Notebook and PDF Card Creator)
+Front and Back are small rich-text editors, so a card can have headings, lists, formulas and pictures. **The result is plain Anki HTML**: the cards render the same in Anki on an iPad, phone or desktop without this add-on.
+
+| You write | The field stores |
+| --- | --- |
+| `#` / `##` / `###` + space, or the **H1–H3** buttons | `<h1>`…`<h3>` (deeper levels from pasted text become `<h3>`) |
+| `-`, `*` or `•` + space, or **•** | `<ul><li>` |
+| `1.` / `4)` + space, or **1.** | `<ol>` (starts at the number you typed: `start="4"`) |
+| **Tab** / **Shift+Tab** (or **⇥ ⇤**) in a list | nested lists; nested ordered lists use `type="a"`, then `type="i"` |
+| **Ctrl+B / I / U** | `<b>`, `<i>`, `<u>` |
+| `$x^2$` (or **∑**) | `\(x^2\)`, rendered by Anki's MathJax; `\[ … \]` pasted from a note becomes a display formula |
+| **Ctrl+V** of a picture, or dropping an image file | `<img data-img="3">` in the session, `<img src="synapse_notes_<hash>.<ext>">` in Anki |
+
+- `$…$` follows the usual rule: no space after the opening or before the closing `$`, and the closing `$` is not followed by a digit, so "costs $5 and $6" stays text. A click on a formula turns it back into `$…$` for editing. Formulas containing `}}` are written as `} }` so they cannot end a cloze early.
+- Cloze: **New cloze** / **Same cloze** insert `{{cN::` and `}}` around the selection; formatting that the selection covers completely stays inside (`{{c1::<b>x</b>}}`). A cloze may contain markup and formulas.
+- Pasted HTML (from a website, a PDF, another note) is cleaned in the page and again in Python: only the tags above survive; classes, styles, links, scripts and foreign images are dropped. Selections taken from the notebook or the PDF keep their `\( … \)` formulas.
+- The session stores each field as an HTML string (flag `rich: true` on the session). Sessions saved by older versions hold plain text with `[[img:N]]` markers and are converted once when loaded.
+- Pictures stay out of the field HTML: the session keeps `images` (id → `data:` URI) and `nextImage`. Large screenshots are scaled to 1600 px and re-encoded; at most 12 pictures per session, 2 MB each. Pictures no field uses any more are dropped when the session is saved. Loaded sessions are cleaned (only well-formed png/jpeg/gif/webp).
+- On creating, the batch carries the field HTML and just the pictures cards use. `card_html.sanitize` (allow-list, pure Python) re-checks every field, `notebook_cards.decode_batch_images` checks the pictures by their bytes (SVG rejected; at most 40 and 40 MB per batch), and `<img data-img>` becomes `<img src="synapse_notes_<hash>.<ext>">` with the file in Anki's media folder, identical pictures once. A placeholder without its picture stops the batch with a message. A field with only empty blocks counts as empty. Limits: 50,000 characters per field in the page; the cloze rule is `{{cN::…}}` up to the first `}}`.
+- Code: `web_notebook/card_editor.js` (the editor; the field element exposes `.value` like a textarea) and `web_notebook/card_images.js` (picture helpers), both inlined into the two pages by `notebook_sidebar.py`; KaTeX is inlined into the PDF page as it is for the notebook.
 
 ## AI assistant and notes
 The chat (`chat_ui.html`, `ai_assistant.py`) can read notebook pages and suggest cards from them. Reading is strictly read-only.
@@ -101,5 +118,5 @@ All additive; older data and unknown fields keep working.
 | add-on settings | `sync_*` (see [NOTEBOOK_SYNC.md](NOTEBOOK_SYNC.md)) |
 
 ## Tests
-- Python: `test_notebook_text`, `test_notebook_cards`, `test_ai_notes_context`, `test_ai_cards_action`, `test_notebook_card_batch` (run with `python -m unittest discover -s tests -p "test_*.py"`).
-- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`, `web_pdf_card_images.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.
+- Python: `test_notebook_text`, `test_notebook_cards`, `test_card_html`, `test_ai_notes_context`, `test_ai_cards_action`, `test_notebook_card_batch` (run with `python -m unittest discover -s tests -p "test_*.py"`).
+- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_card_editor.cjs` (rich fields on both pages), `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`, `web_pdf_card_images.cjs`, `web_pdf_search.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.

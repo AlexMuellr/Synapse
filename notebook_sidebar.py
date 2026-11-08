@@ -234,8 +234,17 @@ def _build_i18n_script(tool_name: str) -> str:
             "card_img_hint": _("Paste a picture with Ctrl+V; it appears where the cursor is."),
             "card_img_failed": _("This picture could not be added."),
             "card_img_limit": _("A session can hold at most {count} pictures."),
-            "card_img_find": _("Click to find the picture in the text"),
-            "card_img_remove": _("Remove picture"),
+            "card_fmt_bold": _("Bold (Ctrl+B)"),
+            "card_fmt_italic": _("Italic (Ctrl+I)"),
+            "card_fmt_underline": _("Underline (Ctrl+U)"),
+            "card_fmt_h1": _("Heading 1"),
+            "card_fmt_h2": _("Heading 2"),
+            "card_fmt_h3": _("Heading 3"),
+            "card_fmt_bullets": _("Bullet list"),
+            "card_fmt_numbers": _("Numbered list"),
+            "card_fmt_indent": _("Indent (Tab)"),
+            "card_fmt_outdent": _("Outdent (Shift+Tab)"),
+            "card_fmt_formula": _("Formula ($…$)"),
             "math_inline_placeholder": _("LaTeX, e.g. x^2"),
             "math_inline_hint": _("Enter to finish · Esc to close"),
             "card_creator": _("Card Creator"),
@@ -499,11 +508,28 @@ def _build_i18n_script(tool_name: str) -> str:
             "select_pages_hint":   _("Click PDF pages to select them."),
             "cards_ready":         _("{count} cards ready"),
             "cards_label":         _("Cards"),
+            "find_btn":            _("Search in PDF (Ctrl+F)"),
+            "find_placeholder":    _("Search in PDF…"),
+            "find_prev":           _("Previous result (Shift+Enter)"),
+            "find_next":           _("Next result (Enter)"),
+            "find_close":          _("Close search (Esc)"),
+            "find_none":           _("No results"),
+            "find_count":          _("{current} / {total}"),
+            "find_indexing":       _("Indexing… {done} / {total}"),
             "card_img_hint":       _("Paste a picture with Ctrl+V; it appears where the cursor is."),
             "card_img_failed":     _("This picture could not be added."),
             "card_img_limit":      _("A session can hold at most {count} pictures."),
-            "card_img_find":       _("Click to find the picture in the text"),
-            "card_img_remove":     _("Remove picture"),
+            "card_fmt_bold": _("Bold (Ctrl+B)"),
+            "card_fmt_italic": _("Italic (Ctrl+I)"),
+            "card_fmt_underline": _("Underline (Ctrl+U)"),
+            "card_fmt_h1": _("Heading 1"),
+            "card_fmt_h2": _("Heading 2"),
+            "card_fmt_h3": _("Heading 3"),
+            "card_fmt_bullets": _("Bullet list"),
+            "card_fmt_numbers": _("Numbered list"),
+            "card_fmt_indent": _("Indent (Tab)"),
+            "card_fmt_outdent": _("Outdent (Shift+Tab)"),
+            "card_fmt_formula": _("Formula ($…$)"),
             "deck_name":           _("Deck name"),
             "deck_placeholder":    _("Choose an existing deck or enter a new name"),
             "current_deck":        _("Current deck"),
@@ -630,8 +656,11 @@ _CARD_IMAGES_PLACEHOLDER = '<script id="synapse-card-images-placeholder"></scrip
 def _card_images_tag() -> str:
     """Pictures inside card fields (Card Creators of the notebook and the PDF tab): inline, as setHtml has no base URL."""
     try:
-        with open(os.path.join(addon_dir(), HTML_DIR, "card_images.js"), "r", encoding="utf-8") as handle:
-            return "<script>" + handle.read().replace("</", "<\\/") + "</script>"
+        parts = []
+        for name in ("card_images.js", "card_editor.js"):
+            with open(os.path.join(addon_dir(), HTML_DIR, name), "r", encoding="utf-8") as handle:
+                parts.append("<script>" + handle.read().replace("</", "<\\/") + "</script>")
+        return "".join(parts)
     except OSError as exc:
         print(f"Card Creator pictures unavailable: {exc}")
         return ""
@@ -2161,6 +2190,8 @@ class NotebookPanel(QWidget):
 
         if tool_name in ("notebook", "pdf"):
             html = html.replace(_CARD_IMAGES_PLACEHOLDER, _card_images_tag(), 1)
+        if tool_name == "pdf":
+            html = html.replace(_KATEX_PLACEHOLDER, _katex_inline_tags(), 1)   # formulas in card fields
         if tool_name == "todo":
             with open(os.path.join(addon_dir(), HTML_DIR, "task_schedule.js"), encoding="utf-8") as source:
                 html = html.replace('<script src="task_schedule.js"></script>', '<script>' + source.read() + '</script>')
@@ -2875,8 +2906,9 @@ class NotebookPanel(QWidget):
                 )
                 return
 
-            # Pictures pasted into card fields arrive separately; the text holds [[img:N]] markers.
-            from .notebook_cards import decode_batch_images, image_ids
+            # Fields are HTML (see card_html); pictures arrive separately and the HTML holds <img data-img="N">.
+            from .notebook_cards import decode_batch_images
+            from . import card_html
             try:
                 pictures = decode_batch_images(data.get("images"))
             except ValueError:
@@ -2892,9 +2924,12 @@ class NotebookPanel(QWidget):
                 back = raw_card.get("back", "")
                 if not isinstance(front, str) or not isinstance(back, str):
                     raise ValueError("PDF card fields must be strings")
-                front = front.strip()
-                back = back.strip()
-                if any(i not in pictures for i in image_ids(front) + image_ids(back)):
+                if len(front) + len(back) > MAX_PDF_CARD_CHARS * 4:
+                    self._notify_pdf_action(callback, False, too_long)
+                    return
+                front = card_html.sanitize(front)[0]
+                back = card_html.sanitize(back)[0]
+                if any(i not in pictures for i in card_html.image_ids(front) + card_html.image_ids(back)):
                     self._notify_pdf_action(
                         callback, False, _("A picture used in a card is missing. Paste it again.")
                     )
@@ -2906,7 +2941,7 @@ class NotebookPanel(QWidget):
                 except ValueError as error:
                     self._notify_pdf_action(callback, False, _(str(error)))
                     return
-                if not front:
+                if not card_html.has_content(front):
                     self._notify_pdf_action(
                         callback, False, _("Every card needs a front side.")
                     )
@@ -2971,7 +3006,7 @@ class NotebookPanel(QWidget):
 
         def create_batch(col):
             from .pdf_card_types import resolve
-            from .notebook_cards import field_html
+            from .card_html import sanitize as field_html
             undo_entry = col.add_custom_undo_entry(undo_label)
             try:
                 types = {kind: resolve(col, kind) for kind in dict.fromkeys(card['type'] for card in cards)}

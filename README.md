@@ -50,7 +50,8 @@ Additional features include:
 - Classic, Focus, and Overview layouts for the Custom Deck Overview
 - Timer Analytics with study time by deck
 - AI formula rendering, answer copying, layout settings, and DeepSeek API support
-- Basic, reversed, and Cloze cards in the PDF Card Creator
+- Basic, reversed, and Cloze cards in the PDF Card Creator, with headings, lists, formulas and pictures that stay plain Anki HTML
+- Full-text search in PDFs (Ctrl+F)
 - More consistent Dark Mode, per-feature sidebar widths, and Polish as the tenth language
 
 ## Requirements

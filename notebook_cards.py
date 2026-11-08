@@ -128,16 +128,11 @@ def prepare_notes(cards: Any, images: dict[str, str]) -> list[dict]:
 
 
 # ── Pictures inside the text of a card field (Card Creators) ──────────────────
-# The page keeps a field as plain text with markers such as [[img:3]] where a picture was pasted and
-# sends the pictures separately. Markers become <img> tags; the files go to Anki's media folder.
+# The page sends a field as HTML with <img data-img="N"> placeholders and the pictures separately
+# (card_html.sanitize turns them into media files).
 
-IMAGE_TOKEN = re.compile(r"\[\[img:(\d{1,6})\]\]")
 MAX_BATCH_IMAGES = 40
 MAX_BATCH_IMAGE_BYTES = 40 * 1024 * 1024
-
-
-def image_ids(text: Any) -> list[str]:
-    return IMAGE_TOKEN.findall(text) if isinstance(text, str) else []
 
 
 def decode_batch_images(raw: Any) -> dict[str, tuple[bytes, str]]:
@@ -159,31 +154,3 @@ def decode_batch_images(raw: Any) -> dict[str, tuple[bytes, str]]:
             raise ValueError("pictures too large")
         decoded[key] = image
     return decoded
-
-
-def field_html(text: str, images: dict[str, tuple[bytes, str]]) -> tuple[str, list[tuple[str, bytes]]]:
-    """A field's text as Anki HTML (escaped, line breaks kept, markers replaced by <img>).
-
-    Returns (html, media) where media lists (file name, bytes) still to be stored. A marker whose
-    picture was not sent raises ValueError, so a picture is never silently lost.
-    """
-    media: list[tuple[str, bytes]] = []
-    out: list[str] = []
-    position = 0
-    text = str(text or "").replace("\x00", "").strip()
-
-    def plain(chunk: str) -> str:
-        return html.escape(chunk.replace("\r\n", "\n").replace("\r", "\n")).replace("\n", "<br>")
-
-    for match in IMAGE_TOKEN.finditer(text):
-        out.append(plain(text[position:match.start()]))
-        picture = images.get(match.group(1))
-        if picture is None:
-            raise ValueError("missing picture")
-        data, extension = picture
-        name = media_name(data, extension)
-        media.append((name, data))
-        out.append(f'<img src="{name}">')
-        position = match.end()
-    out.append(plain(text[position:]))
-    return "".join(out), media

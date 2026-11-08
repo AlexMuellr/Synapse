@@ -165,9 +165,9 @@ class NotebookBatchTests(Harness):
 
     def test_pictures_pasted_into_fields_become_media_and_img_tags(self):
         callback, ok, message = self.create({'deckName': 'D', 'images': {'1': self.PNG_URI, '2': self.PNG_URI}, 'cards': [
-            {'front': 'Look at this\n[[img:1]]\nwhat is it? <b>', 'back': '[[img:2]]\nAnswer', 'type': 'basic'},
-            {'front': '[[img:1]]', 'back': '', 'type': 'basic'},
-            {'front': 'A {{c1::cloze}}', 'back': 'Extra\n[[img:1]]', 'type': 'cloze'}]})
+            {'front': 'Look at this<br><img data-img="1"><br>what is it? &lt;b&gt;', 'back': '<img data-img="2"><br>Answer', 'type': 'basic'},
+            {'front': '<img data-img="1">', 'back': '', 'type': 'basic'},
+            {'front': 'A {{c1::cloze}}', 'back': 'Extra<br><img data-img="1">', 'type': 'cloze'}]})
         self.assertTrue(ok, message)
         self.assertEqual(len(self.col.media_written), 1, 'the same picture is stored once however often it is used')
         [(name, data)] = self.col.media_written.items()
@@ -179,8 +179,27 @@ class NotebookBatchTests(Harness):
         self.assertEqual(third[1], f'Extra<br><img src="{name}">')
         self.assertIn('Created', message)
 
+    def test_rich_fields_are_stored_as_plain_anki_html(self):
+        dirty = ('<h2 class="x" onclick="evil()">Title</h2><script>alert(1)</script><ol start="3"><li>one<ul><li>deep</li></ul></li></ol>'
+                 '<p style="color:red">\\(x^2\\)</p><a href="http://e">link</a><iframe src="x"></iframe>')
+        callback, ok, message = self.create({'deckName': 'D', 'cards': [{'front': dirty, 'back': '', 'type': 'basic'}]})
+        self.assertTrue(ok, message)
+        self.assertEqual(self.col.added[0].note.fields[0],
+                         '<h2>Title</h2><ol start="3"><li>one<ul><li>deep</li></ul></li></ol><p>\\(x^2\\)</p>link')
+
+    def test_cloze_may_contain_markup_and_formulas_with_braces(self):
+        front = 'A {{c1::<b>bold</b> \\(\\frac{a}{b}\\)}} end'
+        callback, ok, message = self.create({'deckName': 'D', 'cards': [{'front': front, 'back': '', 'type': 'cloze'}]})
+        self.assertTrue(ok, message)
+        self.assertEqual(self.col.added[0].note.fields[0], front)
+
+    def test_a_front_that_is_only_markup_is_empty(self):
+        callback, ok, message = self.create({'deckName': 'D', 'cards': [{'front': '<div><br></div>', 'back': 'x', 'type': 'basic'}]})
+        self.assertFalse(ok)
+        self.assertIn('front', message)
+
     def test_bad_pictures_stop_the_batch_without_creating_anything(self):
-        good = {'front': 'Q', 'back': '[[img:1]]', 'type': 'basic'}
+        good = {'front': 'Q', 'back': '<img data-img="1">', 'type': 'basic'}
         cases = [
             ({'images': {'1': 'data:image/svg+xml;base64,PHN2Zz4='}, 'cards': [good]}, 'not valid'),
             ({'images': {'1': 'data:image/png;base64,AAAA'}, 'cards': [good]}, 'not valid'),
@@ -189,7 +208,7 @@ class NotebookBatchTests(Harness):
             ({'images': {str(i): self.PNG_URI for i in range(1, 60)}, 'cards': [good]}, 'not valid'),
             ({'images': {}, 'cards': [good]}, 'missing'),
             ({'images': {'2': self.PNG_URI}, 'cards': [good]}, 'missing'),
-            ({'images': {'1': self.PNG_URI}, 'cards': [{'front': '[[img:9]]', 'back': '', 'type': 'basic'}]}, 'missing'),
+            ({'images': {'1': self.PNG_URI}, 'cards': [{'front': '<img data-img="9">', 'back': '', 'type': 'basic'}]}, 'missing'),
         ]
         for payload, expected in cases:
             callback, ok, message = self.create({'deckName': 'D', **payload})
@@ -200,7 +219,7 @@ class NotebookBatchTests(Harness):
 
     def test_pdf_mode_handles_pictures_too(self):
         callback, ok, message = self.create({'deckName': 'PDFs', 'images': {'1': self.PNG_URI}, 'cards': [
-            {'front': 'Q [[img:1]]', 'back': 'A', 'type': 'basic'}]}, notebook=False)
+            {'front': 'Q <img data-img="1">', 'back': 'A', 'type': 'basic'}]}, notebook=False)
         self.assertEqual((callback, ok), ('onPdfCardBatchCreated', True), message)
         self.assertIn('<img src="synapse_notes_', self.col.added[0].note.fields[0])
 

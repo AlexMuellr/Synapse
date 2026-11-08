@@ -435,6 +435,11 @@
       flex-direction: column; overflow: hidden;
     }
     #card-creator-panel.open { display: flex; }
+    #card-creator-panel .creator-resizer { display: none; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 20; touch-action: none; }
+    #card-creator-panel .creator-resizer::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .12s; }
+    body.synapse-wide #card-creator-panel .creator-resizer { display: block; }
+    #card-creator-panel .creator-resizer:hover::after, #card-creator-panel.resizing .creator-resizer::after { background: var(--accent, #0071D3); }
+    body.creator-resizing { cursor: col-resize !important; user-select: none !important; }
     .creator-header {
       display: flex; align-items: center; gap: 10px; padding: 12px 14px;
       border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -566,8 +571,8 @@
     body.synapse-wide #canvas-wrap { order: 1; }
     body.synapse-wide #card-creator-panel {
       order: 2;
-      flex: 0 0 clamp(300px, 34vw, 390px);
-      width: clamp(300px, 34vw, 390px); max-width: 44%; max-height: none;
+      flex: 0 0 var(--creator-w, clamp(300px, 34vw, 390px));
+      width: var(--creator-w, clamp(300px, 34vw, 390px)); max-width: 75%; max-height: none;
       border-bottom: none; border-left: 1px solid var(--border);
     }
     body.synapse-wide #creator-sidebar-hint { display: none; }
@@ -716,6 +721,7 @@ body textarea:focus-visible, body a[href]:focus-visible, body [tabindex]:focus-v
 
   <div id="viewer-workspace">
   <aside id="card-creator-panel" aria-label="Card Creator">
+    <div class="creator-resizer" id="creator-resizer" role="separator" aria-orientation="vertical" title="Drag to resize · double-click to reset"></div>
     <div class="creator-header">
       <div class="creator-title-wrap">
         <div class="creator-title" data-i18n="card_creator">Card Creator</div>
@@ -2614,6 +2620,32 @@ if (window.__SYNAPSE_PDF_PRELOAD__ !== undefined) {
 } else {
   pycmd('notion_mini:pdf:load');
 }
+
+// Drag the left edge to make the Card Creator wider or narrower (double-click resets). Width is remembered per viewer.
+(function () {
+  const KEY = 'synapse_pdf_creator_width', MIN = 280;
+  const panel = document.getElementById('card-creator-panel'), handle = document.getElementById('creator-resizer');
+  if (!panel || !handle) return;
+  const limit = () => Math.max(MIN, Math.min(760, Math.round(((panel.parentElement && panel.parentElement.clientWidth) || window.innerWidth) * 0.75)));
+  const apply = w => { if (w == null) panel.style.removeProperty('--creator-w'); else panel.style.setProperty('--creator-w', Math.max(MIN, Math.min(limit(), Math.round(w))) + 'px'); };
+  try { const saved = parseInt(localStorage.getItem(KEY), 10); if (saved > 0) apply(saved); } catch (e) {}
+  const remember = () => { try { const w = parseInt(panel.style.getPropertyValue('--creator-w'), 10); w ? localStorage.setItem(KEY, String(w)) : localStorage.removeItem(KEY); } catch (e) {} };
+  handle.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    handle.setPointerCapture(ev.pointerId);
+    panel.classList.add('resizing'); document.body.classList.add('creator-resizing');
+    const startX = ev.clientX, startW = panel.getBoundingClientRect().width;
+    const move = e => apply(startW + startX - e.clientX);
+    const done = () => {
+      handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', done); handle.removeEventListener('pointercancel', done);
+      panel.classList.remove('resizing'); document.body.classList.remove('creator-resizing'); remember();
+    };
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', done); handle.addEventListener('pointercancel', done);
+  });
+  handle.addEventListener('dblclick', () => { apply(null); remember(); });
+  window.addEventListener('resize', () => { const w = parseInt(panel.style.getPropertyValue('--creator-w'), 10); if (w) apply(w); });
+})();
 </script>
 <script>
 // ── SynapsePro i18n: apply data-i18n / data-i18n-placeholder attributes ──

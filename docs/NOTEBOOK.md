@@ -63,6 +63,10 @@ The Card Creator of the PDF tab is also available here (button **Card Creator** 
 - The unfinished session lives in the notebook snapshot as `cardCreatorSession` (sanitized when loaded, excluded from page undo/redo). It survives a restart.
 - Creating goes through `NotebookPanel._create_pdf_card_batch(body, notebook=True)`, the same validated, undoable batch as the PDF tab (answer callback `onNotebookCardBatchCreated`). Limits are the PDF ones: 500 cards per session, 50,000 characters per card.
 
+### Card Creator width
+
+Drag the left edge of the Card Creator to make it wider or narrower (280–760 px, at most 75 % of the window); double-click the edge to reset. The width is remembered separately for the notebook and the PDF tab. In the PDF tab the handle appears in the side-by-side layout (fullscreen or window mode); in the narrow sidebar the creator sits above the PDF.
+
 ### Rich card fields (Notebook and PDF Card Creator)
 Front and Back are small rich-text editors, so a card can have headings, lists, formulas and pictures. **The result is plain Anki HTML**: the cards render the same in Anki on an iPad, phone or desktop without this add-on.
 
@@ -119,4 +123,4 @@ All additive; older data and unknown fields keep working.
 
 ## Tests
 - Python: `test_notebook_text`, `test_notebook_cards`, `test_card_html`, `test_ai_notes_context`, `test_ai_cards_action`, `test_notebook_card_batch` (run with `python -m unittest discover -s tests -p "test_*.py"`).
-- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_card_editor.cjs` (rich fields on both pages), `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`, `web_pdf_card_images.cjs`, `web_pdf_search.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.
+- Browser (Playwright, Chromium-based browser via `SYNAPSE_TEST_CHROME`): `web_notebook_lists_latex_colors.cjs` (lists, LaTeX, colors, parentheses, slash menu, markdown caret), `web_notebook_card_creator.cjs`, `web_card_editor.cjs` (rich fields on both pages), `web_chat_cards.cjs`, `web_notebook_copy_paste.cjs`, `web_notebook_highlight.cjs`, `web_notebook_inline_math.cjs`, `web_notebook_scroll.cjs`, `web_tab_keys.cjs`, `web_pdf_card_images.cjs`, `web_pdf_search.cjs`, `web_creator_resize.cjs`. `test_notebook_shortcuts`, `test_sidebar_default_width` and `test_notebook_view_state` cover the shortcut setting, the opening width, the remembered scroll position and tab switching.
